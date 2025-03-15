@@ -1,0 +1,50 @@
+FROM node:22.14.0-bullseye-slim as base
+
+RUN mkdir -p /home/frontend
+
+WORKDIR /home/frontend
+COPY package*.json ./
+COPY tsconfig*.json ./
+COPY next.config.mjs ./
+RUN npm install
+
+# Installer stage
+FROM base as installer
+WORKDIR /home/frontend
+COPY . .
+RUN npm install
+
+# Builder stage
+FROM installer as builder
+
+ARG NEXT_PUBLIC_API_URL
+ARG NEXTAUTH_URL
+ARG GOOGLE_CLIENT_ID
+ARG GOOGLE_CLIENT_SECRET
+ARG NEXTAUTH_SECRET
+ARG AUTH_FIREBASE_API_KEY
+ARG AUTH_FIREBASE_MESSAGING_SENDER_ID
+ARG AUTH_FIREBASE_APP_ID
+
+RUN echo "NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL" > .env
+RUN echo "NEXTAUTH_URL=$NEXTAUTH_URL" >> .env
+RUN echo "GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID" >> .env
+RUN echo "GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET" >> .env
+RUN echo "NEXTAUTH_SECRET=$NEXTAUTH_SECRET" >> .env
+RUN echo "AUTH_FIREBASE_API_KEY=$AUTH_FIREBASE_API_KEY" >> .env
+RUN echo "AUTH_FIREBASE_MESSAGING_SENDER_ID=$AUTH_FIREBASE_MESSAGING_SENDER_ID" >> .env
+RUN echo "AUTH_FIREBASE_APP_ID=$AUTH_FIREBASE_APP_ID" >> .env
+RUN echo "AUTH_FIREBASE_AUTH_DOMAIN=$AUTH_FIREBASE_AUTH_DOMAIN" >> .env
+RUN echo "AUTH_FIREBASE_PROJECT_ID=$AUTH_FIREBASE_PROJECT_ID" >> .env
+RUN echo "AUTH_FIREBASE_STORAGE_BUCKET=$AUTH_FIREBASE_STORAGE_BUCKET" >> .env
+RUN echo "AUTH_FIREBASE_MEASUREMENT_ID=$AUTH_FIREBASE_MEASUREMENT_ID" >> .env
+
+WORKDIR /home/frontend
+RUN npm run build
+
+# Final stage
+FROM node:22.14.0-bullseye-slim as final
+WORKDIR /home/frontend
+COPY --from=builder /home/frontend ./
+
+CMD ["npm", "start"]

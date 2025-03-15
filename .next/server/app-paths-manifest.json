@@ -1,0 +1,7 @@
+{
+  "/chat/[id]/page": "app/chat/[id]/page.js",
+  "/page": "app/page.js",
+  "/workflow/[id]/page": "app/workflow/[id]/page.js",
+  "/chat/page": "app/chat/page.js",
+  "/api/conversation/route": "app/api/conversation/route.js"
+}
