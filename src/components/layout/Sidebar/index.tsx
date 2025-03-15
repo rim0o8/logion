@@ -11,8 +11,8 @@ import {
 import { Menu } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { ConversationList } from "./ConversationList";
 import { ModeToggle } from "./ModeToggle";
-import { Navigation } from "./Navigation/index";
 
 export const Sidebar: React.FC = () => {
     const [open, setOpen] = useState(false);
@@ -36,19 +36,19 @@ export const Sidebar: React.FC = () => {
                 <div className="flex items-center justify-between p-4 border-b">
                     <Link href="/" onClick={() => setOpen(false)} className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                            <span className="text-primary-foreground font-bold">O</span>
+                            <span className="text-primary-foreground font-bold">L</span>
                         </div>
-                        <SheetTitle className="text-xl">Omoroi AI</SheetTitle>
+                        <SheetTitle className="text-xl">LLMアプリ</SheetTitle>
                     </Link>
                 </div>
                 
                 <div className="flex-1 overflow-y-auto py-2">
-                    <Navigation closeMenu={() => setOpen(false)} />
+                    <ConversationList closeMenu={() => setOpen(false)} />
                 </div>
                 
                 <div className="border-t p-4 flex items-center justify-between">
                     <div className="text-sm text-muted-foreground">
-                        Firebug
+                        v1.0.0
                     </div>
                     <ModeToggle />
                 </div>
