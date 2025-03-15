@@ -37,9 +37,7 @@ export default function RootLayout({
               </div>
             </header>
             
-            <div className="fixed top-4 left-4 z-50">
-              <Sidebar />
-            </div>
+            <Sidebar />
             
             <main className="container mx-auto pt-4 pb-10">
               <Suspense fallback={<div className="flex items-center justify-center h-[calc(100vh-3.5rem)]"><div className="animate-pulse text-foreground">Loading...</div></div>}>
