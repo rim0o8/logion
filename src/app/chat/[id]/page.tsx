@@ -44,7 +44,6 @@ export default function ChatPage() {
         updatedAt: new Date().toISOString()
       };
       saveConversation(updatedConversation);
-      setConversation(updatedConversation);
     }
   }, [messages, conversation]);
 

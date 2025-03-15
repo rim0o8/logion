@@ -3,9 +3,9 @@ import type { Conversation } from "@/lib/storage";
 import { deleteConversation, getConversations } from "@/lib/storage";
 import { formatDistanceToNow } from "date-fns";
 import { ja } from "date-fns/locale";
-import { MessageSquare, Plus, Trash2 } from "lucide-react";
+import { Home, Info, MessageSquare, Plus, Settings, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 interface ConversationListProps {
@@ -15,6 +15,7 @@ interface ConversationListProps {
 export function ConversationList({ closeMenu }: ConversationListProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const router = useRouter();
+  const pathname = usePathname();
 
   // 会話リストを取得
   useEffect(() => {
@@ -55,22 +56,65 @@ export function ConversationList({ closeMenu }: ConversationListProps) {
     }
   };
 
+  // ナビゲーション処理
+  const handleNavigation = (path: string) => {
+    router.push(path as any);
+    if (closeMenu) closeMenu();
+  };
+
   return (
     <div className="px-2 py-2">
-      <div className="mb-4">
-        <Button 
-          onClick={handleNewConversation}
+      <div className="space-y-1 mb-6">
+        <Button
+          variant={pathname === '/' ? "secondary" : "ghost"}
           className="w-full justify-start gap-2"
-          variant="outline"
+          onClick={() => handleNavigation('/')}
         >
-          <Plus className="h-4 w-4" />
+          <Home className="h-4 w-4" />
+          ホーム
+        </Button>
+
+        <Button
+          variant={pathname === '/chat' && !pathname.includes('/chat/') ? "secondary" : "ghost"}
+          className="w-full justify-start gap-2"
+          onClick={() => handleNavigation('/chat')}
+        >
+          <MessageSquare className="h-4 w-4" />
           新しい会話
+        </Button>
+
+        <Button
+          variant="ghost"
+          className="w-full justify-start gap-2"
+          onClick={() => alert('設定ページは準備中です')}
+        >
+          <Settings className="h-4 w-4" />
+          設定
+        </Button>
+        
+        <Button
+          variant="ghost"
+          className="w-full justify-start gap-2"
+          onClick={() => alert('このアプリについてのページは準備中です')}
+        >
+          <Info className="h-4 w-4" />
+          このアプリについて
         </Button>
       </div>
 
       <div className="space-y-1">
-        <h3 className="px-3 text-xs font-medium text-muted-foreground">会話履歴</h3>
-        
+        <div className="flex items-center justify-between px-3 py-2">
+          <h3 className="text-xs font-medium text-muted-foreground">会話履歴</h3>
+          <Button 
+            onClick={handleNewConversation}
+            size="icon"
+            variant="ghost"
+            className="h-6 w-6 rounded-full"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+
         {conversations.length === 0 ? (
           <p className="px-3 text-xs text-muted-foreground py-2">
             会話履歴はありません
@@ -82,7 +126,7 @@ export function ConversationList({ closeMenu }: ConversationListProps) {
                 key={conversation.id}
                 href={`/chat/${conversation.id}`}
                 onClick={closeMenu}
-                className="flex items-center justify-between px-3 py-2 text-sm rounded-md hover:bg-secondary transition-colors"
+                className="flex items-center justify-between px-3 py-2 text-sm rounded-md hover:bg-secondary transition-colors group"
               >
                 <div className="flex items-center gap-2 overflow-hidden">
                   <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground" />
