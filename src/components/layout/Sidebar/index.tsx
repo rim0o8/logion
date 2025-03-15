@@ -31,7 +31,7 @@ export const Sidebar: React.FC = () => {
             </SheetTrigger>
             <SheetContent 
                 side="left" 
-                className="flex flex-col border-r p-0 w-[280px] sm:w-[320px] z-[100]"
+                className="flex flex-col border-r p-0 w-[280px] sm:w-[320px] z-[40]"
                 onEscapeKeyDown={() => setOpen(false)}
                 onCloseAutoFocus={(e) => e.preventDefault()}
                 hideCloseButton={true}

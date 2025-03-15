@@ -42,7 +42,7 @@ export default function RootLayout({
             </div>
             
             <main className="container mx-auto pt-4 pb-10">
-              <Suspense fallback={<div className="flex items-center justify-center h-[calc(100vh-3.5rem)]"><div className="animate-pulse">Loading...</div></div>}>
+              <Suspense fallback={<div className="flex items-center justify-center h-[calc(100vh-3.5rem)]"><div className="animate-pulse text-foreground">Loading...</div></div>}>
                 {children}
               </Suspense>
             </main>

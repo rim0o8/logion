@@ -121,7 +121,7 @@ export default function NewChatPage() {
   }
 
   return (
-    <main className="flex-1 flex flex-col h-full bg-white">
+    <main className="flex-1 flex flex-col h-full bg-background">
       <ChatContainer
         messages={displayMessages}
         onSendMessage={handleSendMessage}

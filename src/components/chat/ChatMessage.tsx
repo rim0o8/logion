@@ -17,14 +17,16 @@ export function ChatMessage({ message, isLoading }: ChatMessageProps) {
       isUser ? "justify-end" : "justify-start"
     )}>
       {!isUser && (
-        <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center shrink-0">
-          <Bot className="h-5 w-5 text-white" />
+        <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center shrink-0">
+          <Bot className="h-5 w-5 text-primary-foreground" />
         </div>
       )}
       
       <div className={cn(
         "rounded-2xl px-4 py-3 max-w-[85%] break-words",
-        isUser ? "bg-blue-600 text-white" : "bg-white border shadow-sm"
+        isUser 
+          ? "bg-primary text-primary-foreground" 
+          : "bg-card text-card-foreground border shadow-sm dark:border-border dark:shadow-none"
       )}>
         {isUser ? (
           <p className="whitespace-pre-wrap">{message.content}</p>
@@ -36,9 +38,9 @@ export function ChatMessage({ message, isLoading }: ChatMessageProps) {
             
             {isLoading && (
               <div className="flex items-center space-x-2 mt-2">
-                <div className="w-2 h-2 rounded-full bg-blue-600 animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-2 h-2 rounded-full bg-blue-600 animate-bounce" style={{ animationDelay: '200ms' }} />
-                <div className="w-2 h-2 rounded-full bg-blue-600 animate-bounce" style={{ animationDelay: '400ms' }} />
+                <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '200ms' }} />
+                <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '400ms' }} />
               </div>
             )}
           </>
@@ -46,8 +48,8 @@ export function ChatMessage({ message, isLoading }: ChatMessageProps) {
       </div>
 
       {isUser && (
-        <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-          <User className="h-5 w-5 text-gray-600" />
+        <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+          <User className="h-5 w-5 text-muted-foreground" />
         </div>
       )}
     </div>

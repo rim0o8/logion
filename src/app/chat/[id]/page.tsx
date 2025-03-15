@@ -130,10 +130,10 @@ export default function ChatPage() {
 
   if (isInitialLoading) {
     return (
-      <main className="flex-1 flex flex-col h-full bg-white">
+      <main className="flex-1 flex flex-col h-full bg-background">
         <div className="flex items-center justify-center h-full">
           <div className="animate-pulse text-center">
-            <p className="text-gray-500">読み込み中...</p>
+            <p className="text-muted-foreground">読み込み中...</p>
           </div>
         </div>
       </main>
@@ -141,7 +141,7 @@ export default function ChatPage() {
   }
 
   return (
-    <main className="flex-1 flex flex-col h-full bg-white">
+    <main className="flex-1 flex flex-col h-full bg-background">
       <ChatContainer
         messages={displayMessages}
         onSendMessage={handleSendMessage}
