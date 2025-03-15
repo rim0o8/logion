@@ -1,4 +1,4 @@
-import { LLMConfig } from "@/lib/llm/types";
+import type { LLMConfig } from "@/lib/llm/types";
 
 export const DEFAULT_MODEL = "gpt-4-turbo-preview";
 

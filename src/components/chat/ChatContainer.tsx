@@ -20,8 +20,22 @@ export function ChatContainer({
 
   // メッセージが追加されたら自動スクロール
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+    const handleUpdate = () => {
+      scrollToBottom();
+    };
+    
+    handleUpdate();
+    
+    // messagesやisLoadingが変更されたときにスクロールする
+    const observer = new MutationObserver(handleUpdate);
+    const container = scrollContainerRef.current;
+    
+    if (container) {
+      observer.observe(container, { childList: true, subtree: true });
+    }
+    
+    return () => observer.disconnect();
+  }, []); // 依存配列を空にする
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -53,7 +67,7 @@ export function ChatContainer({
                   isLoading={index === messages.length - 1 && isLoading && message.role === 'assistant'}
                 />
               ))}
-              
+
               {/* ユーザーメッセージの後にAIの応答待ちアニメーションを表示 */}
               {isLoading && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
                 <div className="flex items-start gap-4 py-4">
