@@ -11,15 +11,25 @@ export interface Conversation {
 // ローカルストレージのキー
 const CONVERSATIONS_KEY = 'chat-conversations';
 
+// キャッシュ
+let conversationsCache: Conversation[] | null = null;
+
 // 会話リストを取得
 export function getConversations(): Conversation[] {
   if (typeof window === 'undefined') return [];
+  
+  // キャッシュがあればそれを返す
+  if (conversationsCache !== null) {
+    return [...conversationsCache]; // 配列のコピーを返す
+  }
   
   const stored = localStorage.getItem(CONVERSATIONS_KEY);
   if (!stored) return [];
   
   try {
-    return JSON.parse(stored);
+    const parsed = JSON.parse(stored);
+    conversationsCache = parsed; // キャッシュを更新
+    return [...parsed]; // 配列のコピーを返す
   } catch (error) {
     console.error('会話履歴の解析に失敗しました:', error);
     return [];
@@ -30,41 +40,68 @@ export function getConversations(): Conversation[] {
 export function saveConversation(conversation: Conversation): void {
   if (typeof window === 'undefined') return;
   
-  const conversations = getConversations();
-  const existingIndex = conversations.findIndex(c => c.id === conversation.id);
+  // キャッシュがなければ初期化
+  if (conversationsCache === null) {
+    conversationsCache = getConversations();
+  }
+  
+  const existingIndex = conversationsCache.findIndex(c => c.id === conversation.id);
   
   if (existingIndex >= 0) {
     // 既存の会話を更新
-    conversations[existingIndex] = {
+    conversationsCache[existingIndex] = {
       ...conversation,
       updatedAt: new Date().toISOString()
     };
   } else {
     // 新しい会話を追加
-    conversations.push({
+    conversationsCache.push({
       ...conversation,
       createdAt: conversation.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
   }
   
-  localStorage.setItem(CONVERSATIONS_KEY, JSON.stringify(conversations));
+  // ローカルストレージに保存
+  localStorage.setItem(CONVERSATIONS_KEY, JSON.stringify(conversationsCache));
+  
+  // ストレージイベントを手動でディスパッチ（同一ウィンドウ内の他のコンポーネントに通知）
+  window.dispatchEvent(new StorageEvent('storage', {
+    key: CONVERSATIONS_KEY,
+    newValue: JSON.stringify(conversationsCache)
+  }));
 }
 
 // 会話を削除
 export function deleteConversation(id: string): void {
   if (typeof window === 'undefined') return;
   
-  const conversations = getConversations();
-  const filtered = conversations.filter(c => c.id !== id);
+  // キャッシュがなければ初期化
+  if (conversationsCache === null) {
+    conversationsCache = getConversations();
+  }
   
-  localStorage.setItem(CONVERSATIONS_KEY, JSON.stringify(filtered));
+  // キャッシュから削除
+  conversationsCache = conversationsCache.filter(c => c.id !== id);
+  
+  // ローカルストレージに保存
+  localStorage.setItem(CONVERSATIONS_KEY, JSON.stringify(conversationsCache));
+  
+  // ストレージイベントを手動でディスパッチ
+  window.dispatchEvent(new StorageEvent('storage', {
+    key: CONVERSATIONS_KEY,
+    newValue: JSON.stringify(conversationsCache)
+  }));
 }
 
 // 会話を取得
 export function getConversation(id: string): Conversation | null {
-  const conversations = getConversations();
-  return conversations.find(c => c.id === id) || null;
+  // キャッシュがなければ初期化
+  if (conversationsCache === null) {
+    conversationsCache = getConversations();
+  }
+  
+  return conversationsCache.find(c => c.id === id) || null;
 }
 
 // 新しい会話IDを生成

@@ -6,7 +6,7 @@ import { ja } from "date-fns/locale";
 import { Home, Info, MessageSquare, Plus, Settings, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 interface ConversationListProps {
   closeMenu?: () => void;
@@ -17,27 +17,38 @@ export function ConversationList({ closeMenu }: ConversationListProps) {
   const router = useRouter();
   const pathname = usePathname();
 
+  // 会話リストを取得する関数をメモ化
+  const loadConversations = useCallback(() => {
+    const convs = getConversations();
+    // 日付の新しい順にソート
+    convs.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    setConversations(convs);
+  }, []);
+
   // 会話リストを取得
   useEffect(() => {
-    const loadConversations = () => {
-      const convs = getConversations();
-      // 日付の新しい順にソート
-      convs.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-      setConversations(convs);
-    };
-
     loadConversations();
 
-    // ローカルストレージの変更を監視
-    const handleStorageChange = () => {
-      loadConversations();
+    // ローカルストレージの変更を監視（イベントスロットリングを実装）
+    let timeoutId: NodeJS.Timeout | null = null;
+    const handleStorageChange = (e: StorageEvent) => {
+      // 関連するキーの変更のみ処理
+      if (e.key === 'chat-conversations' || e.key === null) {
+        // 短時間に複数の更新があった場合、最後の更新のみ処理
+        if (timeoutId) clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          loadConversations();
+          timeoutId = null;
+        }, 300);
+      }
     };
 
     window.addEventListener('storage', handleStorageChange);
     return () => {
       window.removeEventListener('storage', handleStorageChange);
+      if (timeoutId) clearTimeout(timeoutId);
     };
-  }, []);
+  }, [loadConversations]);
 
   // 新しい会話を開始
   const handleNewConversation = () => {
@@ -52,13 +63,23 @@ export function ConversationList({ closeMenu }: ConversationListProps) {
     
     if (confirm('この会話を削除してもよろしいですか？')) {
       deleteConversation(id);
-      setConversations(conversations.filter(c => c.id !== id));
+      // ローカルステートを直接更新して再レンダリングを最適化
+      setConversations(prev => prev.filter(c => c.id !== id));
     }
   };
 
   // ナビゲーション処理
   const handleNavigation = (path: string) => {
-    router.push(path as any);
+    if (path === '/') {
+      router.push('/');
+    } else if (path === '/chat') {
+      router.push('/chat');
+    } else {
+      // 他のパスは未実装
+      alert('このページは準備中です');
+      return;
+    }
+    
     if (closeMenu) closeMenu();
   };
 

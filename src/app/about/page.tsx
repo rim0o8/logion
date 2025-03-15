@@ -6,12 +6,6 @@ import Link from "next/link";
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-14 items-center">
-          <h1 className="font-bold">LLMアプリケーションについて</h1>
-        </div>
-      </header>
-
       <main className="container py-8">
         <div className="max-w-3xl mx-auto">
           <h2 className="text-3xl font-bold tracking-tight mb-6">
