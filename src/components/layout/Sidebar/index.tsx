@@ -34,6 +34,7 @@ export const Sidebar: React.FC = () => {
                 className="flex flex-col border-r p-0 w-[280px] sm:w-[320px] z-[100]"
                 onEscapeKeyDown={() => setOpen(false)}
                 onCloseAutoFocus={(e) => e.preventDefault()}
+                hideCloseButton={true}
             >
                 <SheetDescription className="sr-only">
                     会話履歴とアプリケーションのナビゲーションメニュー
