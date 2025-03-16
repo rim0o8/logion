@@ -102,10 +102,13 @@ const authOptions: NextAuthOptions = {
       try {
         if (account?.provider === 'google') {
           const credential = GoogleAuthProvider.credential(account.id_token);
-          const result =await signInWithCredential(auth, credential);
+          const result = await signInWithCredential(auth, credential);
           return true;
         }
-        return false;
+        if (account?.provider === 'credentials') {
+          return true;
+        }
+        return true;
       } catch (error) {
         console.error('Error signing in:', error);
         return false;
