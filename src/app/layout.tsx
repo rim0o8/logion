@@ -32,12 +32,14 @@ export default function RootLayout({
         >
           <div className="relative min-h-screen">
             <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-              <div className="container flex h-14 items-center">
-                <h1 className="font-bold">LLMアプリケーション</h1>
+              <div className="flex h-14 items-center px-4 md:px-6">
+                <div className="flex items-center gap-3">
+                  <Sidebar />
+                  <h1 className="font-bold">LLMアプリケーション</h1>
+                </div>
+                <div className="flex-1" />
               </div>
             </header>
-            
-            <Sidebar />
             
             <main className="container mx-auto pt-4 pb-10">
               <Suspense fallback={<div className="flex items-center justify-center h-[calc(100vh-3.5rem)]"><div className="animate-pulse text-foreground">Loading...</div></div>}>

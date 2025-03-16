@@ -19,23 +19,16 @@ export const Sidebar: React.FC = () => {
     
     return (
         <Sheet open={open} onOpenChange={setOpen}>
-            {/* サイドバーが開いている時はトリガーボタンを非表示 */}
-            <div className={`fixed top-4 left-4 z-50 transition-all duration-300 ${
-                open 
-                ? 'opacity-0 pointer-events-none -translate-x-10' 
-                : 'opacity-100 translate-x-0'
-            }`}>
-                <SheetTrigger asChild>
-                    <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="rounded-full w-10 h-10 bg-background/80 backdrop-blur-sm shadow-md hover:bg-secondary/80 transition-all"
-                        aria-label="メニューを開く"
-                    >
-                        <Menu className="h-5 w-5" />
-                    </Button>
-                </SheetTrigger>
-            </div>
+            <SheetTrigger asChild>
+                <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="rounded-full w-9 h-9 hover:bg-secondary/80 transition-all -ml-3"
+                    aria-label="メニューを開く"
+                >
+                    <Menu className="h-5 w-5" />
+                </Button>
+            </SheetTrigger>
             
             <SheetContent 
                 side="left" 
