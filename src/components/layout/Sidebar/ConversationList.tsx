@@ -3,7 +3,7 @@ import type { Conversation } from "@/lib/storage";
 import { deleteConversation, getConversations } from "@/lib/storage";
 import { formatDistanceToNow } from "date-fns";
 import { ja } from "date-fns/locale";
-import { Home, Info, MessageSquare, Plus, Settings, Trash2 } from "lucide-react";
+import { Home, Info, MessageSquare, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -60,7 +60,7 @@ export function ConversationList({ closeMenu }: ConversationListProps) {
   const handleDeleteConversation = (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (confirm('この会話を削除してもよろしいですか？')) {
       deleteConversation(id);
       // ローカルステートを直接更新して再レンダリングを最適化
@@ -74,12 +74,14 @@ export function ConversationList({ closeMenu }: ConversationListProps) {
       router.push('/');
     } else if (path === '/chat') {
       router.push('/chat');
+    } else if (path === '/about') {
+      router.push('/about');
     } else {
       // 他のパスは未実装
       alert('このページは準備中です');
       return;
     }
-    
+
     if (closeMenu) closeMenu();
   };
 
@@ -105,18 +107,9 @@ export function ConversationList({ closeMenu }: ConversationListProps) {
         </Button>
 
         <Button
-          variant="ghost"
+          variant={pathname === '/about' ? "secondary" : "ghost"}
           className="w-full justify-start gap-2"
-          onClick={() => alert('設定ページは準備中です')}
-        >
-          <Settings className="h-4 w-4" />
-          設定
-        </Button>
-        
-        <Button
-          variant="ghost"
-          className="w-full justify-start gap-2"
-          onClick={() => alert('このアプリについてのページは準備中です')}
+          onClick={() => handleNavigation('/about')}
         >
           <Info className="h-4 w-4" />
           このアプリについて
