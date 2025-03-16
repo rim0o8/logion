@@ -21,11 +21,11 @@ function getModelMultiplier(costFactor: number): number {
   
   if (costFactor >= thresholds.high) {
     return probabilityMultiplier.high;
-  } else if (costFactor >= thresholds.medium) {
-    return probabilityMultiplier.medium;
-  } else {
-    return probabilityMultiplier.low;
   }
+  if (costFactor >= thresholds.medium) {
+    return probabilityMultiplier.medium;
+  }
+  return probabilityMultiplier.low;
 }
 
 // 広告表示確率を計算する関数

@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 // adsbygoogleのための型定義
 declare global {
   interface Window {
-    adsbygoogle: any[];
+    adsbygoogle: Array<Record<string, unknown>>;
   }
 }
 
