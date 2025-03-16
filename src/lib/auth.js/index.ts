@@ -5,7 +5,7 @@ import GoogleProvider from 'next-auth/providers/google';
 
 import { Config } from '@/utils/config';
 import { getApp, getApps, initializeApp } from 'firebase/app';
-import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import { GoogleAuthProvider, getAuth, signInWithCredential, signInWithEmailAndPassword } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: Config.AUTH_FIREBASE_API_KEY,
@@ -98,6 +98,19 @@ const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
+    async signIn({ user, account, profile, email, credentials }) {
+      try {
+        if (account?.provider === 'google') {
+          const credential = GoogleAuthProvider.credential(account.id_token);
+          const result =await signInWithCredential(auth, credential);
+          return true;
+        }
+        return false;
+      } catch (error) {
+        console.error('Error signing in:', error);
+        return false;
+      }
+    },
     async redirect({ url, baseUrl }) {
       return url.startsWith(baseUrl) ? url : baseUrl;
     },
