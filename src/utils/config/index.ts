@@ -38,6 +38,9 @@ interface ConfigType {
     OPENAI_API_KEY: string;
     ANTHROPIC_API_KEY: string;
     DEEPSEEK_API_KEY: string;
+    LANGFUSE_SECRET_KEY: string;
+    LANGFUSE_PUBLIC_KEY: string;
+    LANGFUSE_BASEURL: string;
     NEXT_PUBLIC_DUMMY_ADS: boolean;
     NEXT_PUBLIC_ADMOB_BANNER_ID: string;
     NODE_ENV: string;
@@ -61,6 +64,9 @@ const config: ConfigType = {
     OPENAI_API_KEY: GetEnv('OPENAI_API_KEY', true),
     ANTHROPIC_API_KEY: GetEnv('ANTHROPIC_API_KEY', true),
     DEEPSEEK_API_KEY: GetEnv('DEEPSEEK_API_KEY', true),
+    LANGFUSE_SECRET_KEY: GetEnv('LANGFUSE_SECRET_KEY', true),
+    LANGFUSE_PUBLIC_KEY: GetEnv('LANGFUSE_PUBLIC_KEY', true),
+    LANGFUSE_BASEURL: GetEnv('LANGFUSE_BASEURL', true),
     NEXT_PUBLIC_DUMMY_ADS: CheckEnv('NEXT_PUBLIC_DUMMY_ADS', process.env.NEXT_PUBLIC_DUMMY_ADS) === 'true',
     NEXT_PUBLIC_ADMOB_BANNER_ID: CheckEnv('NEXT_PUBLIC_ADMOB_BANNER_ID', process.env.NEXT_PUBLIC_ADMOB_BANNER_ID),
     NODE_ENV: CheckEnv('NODE_ENV', process.env.NODE_ENV),

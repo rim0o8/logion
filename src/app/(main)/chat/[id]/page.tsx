@@ -7,6 +7,7 @@ import { useInterstitialAd } from '@/lib/ads/webAdManager';
 import type { Message } from "@/lib/llm/types";
 import type { Conversation } from "@/lib/storage";
 import { getConversation, saveConversation } from "@/lib/storage";
+import { useSession } from "next-auth/react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -14,6 +15,7 @@ export default function ChatPage() {
   const params = useParams();
   const router = useRouter();
   const conversationId = params.id as string;
+  const { data: session } = useSession();
   
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -82,6 +84,9 @@ export default function ChatPage() {
           messages: [...messages, userMessage],
           stream: true,
           model: modelToUse, // モデルを指定
+          conversationId: conversationId, // 会話IDを追加
+          userId: session?.user?.email || session?.email,
+          userEmail: session?.user?.email || session?.email,
         }),
       });
 

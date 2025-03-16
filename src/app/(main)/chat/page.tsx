@@ -7,11 +7,13 @@ import { useInterstitialAd } from '@/lib/ads/webAdManager';
 import type { Message } from "@/lib/llm/types";
 import type { Conversation } from "@/lib/storage";
 import { generateConversationId, generateTitle, saveConversation } from "@/lib/storage";
+import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export default function NewChatPage() {
   const router = useRouter();
+  const { data: session } = useSession();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState<string | null>(null);
@@ -34,6 +36,9 @@ export default function NewChatPage() {
       // 初期の空のアシスタントメッセージを追加（ストリーミング用）
       setStreamingContent("");
       
+      // 新しい会話IDを生成
+      const conversationId = generateConversationId();
+      
       // APIリクエスト（ストリーミングモード）
       const response = await fetch('/api/conversation', {
         method: 'POST',
@@ -44,6 +49,9 @@ export default function NewChatPage() {
           messages: updatedMessages,
           stream: true,
           model: model || selectedModel, // モデルを指定
+          conversationId: conversationId, // 会話IDを追加
+          userId: session?.user?.email || session?.email,
+          userEmail: session?.user?.email || session?.email,
         }),
       });
 

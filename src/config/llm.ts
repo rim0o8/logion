@@ -107,7 +107,9 @@ export const MODEL_PROVIDERS = {
   ]
 } as const;
 
-export const getModelProvider = (modelId: string): 'openai' | 'anthropic' | 'deepseek' => {
+export type ModelProvider = 'openai' | 'anthropic' | 'deepseek';
+
+export const getModelProvider = (modelId: string): ModelProvider => {
   if ((MODEL_PROVIDERS.GPT as readonly string[]).includes(modelId)) return 'openai';
   if ((MODEL_PROVIDERS.CLAUDE as readonly string[]).includes(modelId)) return 'anthropic';
   if ((MODEL_PROVIDERS.DEEPSEEK as readonly string[]).includes(modelId)) return 'deepseek';

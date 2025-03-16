@@ -1,4 +1,5 @@
 import { DEFAULT_CONFIG, getModelProvider } from '@/config/llm';
+import { getLangfuse } from '@/lib/langfuse';
 import { ClaudeProvider } from '@/lib/llm/claude-provider';
 import { DeepSeekProvider } from '@/lib/llm/deepseek-provider';
 import { OpenAIProvider } from '@/lib/llm/openai-provider';
@@ -12,6 +13,11 @@ export async function POST(request: Request) {
     const messages: Message[] = body.messages;
     const stream = body.stream === true;
     const model = body.model || DEFAULT_CONFIG.model;
+    const userId = body.userId;
+    const userEmail = body.userEmail;
+    const conversationId = body.conversationId;
+
+    console.log(userId, userEmail, conversationId);
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
@@ -19,6 +25,20 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    // Langfuseのトレースを開始
+    const langfuse = getLangfuse();
+    const trace = langfuse.trace({
+      name: 'conversation',
+      userId: userId,
+      sessionId: conversationId,
+      metadata: {
+        model: model,
+        messageCount: messages.length,
+        userEmail: userEmail,
+        conversationId: conversationId
+      },
+    });
 
     // モデルに基づいて適切なプロバイダーを選択
     const provider = getModelProvider(model);
@@ -38,6 +58,22 @@ export async function POST(request: Request) {
     if (stream) {
       const encoder = new TextEncoder();
       const streamGenerator = llmProvider.streamMessage(messages, config);
+
+      // Langfuseでジェネレーションを記録
+      const generation = trace.generation({
+        name: 'stream-generation',
+        model: model,
+        modelParameters: {
+          temperature: config.temperature,
+          maxTokens: config.maxTokens,
+          topP: config.topP,
+        },
+        input: JSON.stringify(messages),
+        metadata: {
+          conversationId: conversationId,
+          userEmail: userEmail
+        }
+      });
 
       const readableStream = new ReadableStream({
         async start(controller) {
@@ -65,6 +101,16 @@ export async function POST(request: Request) {
             })}\n`);
             controller.enqueue(encodedFinal);
             controller.close();
+
+            // Langfuseでジェネレーションを完了
+            generation.end({
+              output: finalContent,
+            });
+
+            // バックグラウンドでフラッシュ
+            langfuse.flushAsync().catch(err => {
+              console.error('Langfuseフラッシュエラー:', err);
+            });
           } catch (error) {
             console.error('ストリーミングエラー:', error);
             controller.error(error);
@@ -82,7 +128,34 @@ export async function POST(request: Request) {
     }
     
     // 通常モード
+    // Langfuseでジェネレーションを記録
+    const generation = trace.generation({
+      name: 'completion-generation',
+      model: model,
+      modelParameters: {
+        temperature: config.temperature,
+        maxTokens: config.maxTokens,
+        topP: config.topP,
+      },
+      input: JSON.stringify(messages),
+      metadata: {
+        conversationId: conversationId,
+        userEmail: userEmail
+      }
+    });
+
     const response = await llmProvider.sendMessage(messages, config);
+
+    // Langfuseでジェネレーションを完了
+    generation.end({
+      output: response.content,
+    });
+
+    // バックグラウンドでフラッシュ
+    langfuse.flushAsync().catch(err => {
+      console.error('Langfuseフラッシュエラー:', err);
+    });
+
     return NextResponse.json({
       messages: [...messages, response]
     });
