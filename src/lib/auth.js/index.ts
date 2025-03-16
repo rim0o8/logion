@@ -56,9 +56,10 @@ const authOptions: NextAuthOptions = {
       clientSecret: Config.GOOGLE_CLIENT_SECRET as string,
       authorization: {
         params: {
-          prompt: 'consent',
-          access_type: 'offline',
-          response_type: 'code',
+          prompt: "consent",
+          access_type: "offline",
+          response_type: "code",
+          redirect_uri: "http://localhost:3000/api/auth/callback/google",
         },
       },
     }),
@@ -132,6 +133,12 @@ const authOptions: NextAuthOptions = {
   session: {
     strategy: 'jwt',
     maxAge: 90 * 24 * 60 * 60, // 90日（3ヶ月）
+  },
+  pages: {
+    signIn: '/auth/signin',
+    signOut: '/auth/signout',
+    error: '/auth/error',
+    newUser: '/auth/signup',
   },
   jwt: {
     maxAge: 90 * 24 * 60 * 60, // 90日（3ヶ月）

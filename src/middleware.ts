@@ -16,12 +16,34 @@ export const config = {
   ],
 };
 
+// 認証が不要なパスのリスト
+const publicPaths = [
+  '/auth/signin',
+  '/auth/signup',
+  '/auth/error',
+  '/auth/welcome',
+  '/auth/signout',
+  '/about',
+  '/contact',
+];
+
+// パスが公開パスかどうかをチェックする関数
+function isPublicPath(path: string): boolean {
+  return publicPaths.some(publicPath => path.startsWith(publicPath));
+}
+
 // 環境変数WITH_AUTHがtrueの場合のみ認証を適用
 export default async function middleware(req: NextRequest) {
   const withAuthEnabled = Config.WITH_AUTH;
+  const path = req.nextUrl.pathname;
   
   // 認証が無効な場合は、リクエストをそのまま通過させる
   if (!withAuthEnabled) {
+    return NextResponse.next();
+  }
+
+  // 公開パスの場合は認証チェックをスキップ
+  if (isPublicPath(path)) {
     return NextResponse.next();
   }
   
@@ -30,12 +52,15 @@ export default async function middleware(req: NextRequest) {
   
   // トークンが存在しない場合は未認証
   if (!token) {
-    return NextResponse.redirect(new URL("/api/auth/signin", req.url));
+    // 現在のURLをcallbackUrlとして渡す
+    const callbackUrl = encodeURIComponent(req.url);
+    return NextResponse.redirect(new URL(`/auth/welcome?callbackUrl=${callbackUrl}`, req.url));
   }
   
   // トークンの有効期限をチェック
   if (typeof token.expiresAt === 'number' && Date.now() >= token.expiresAt * 1000) {
-    return NextResponse.redirect(new URL("/api/auth/signin", req.url));
+    const callbackUrl = encodeURIComponent(req.url);
+    return NextResponse.redirect(new URL(`/auth/welcome?callbackUrl=${callbackUrl}`, req.url));
   }
   
   // 認証済みの場合は、リクエストをそのまま通過させる
