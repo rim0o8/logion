@@ -4,6 +4,7 @@ export interface Conversation {
   id: string;
   title: string;
   messages: Message[];
+  model?: string; // 使用しているモデル
   createdAt: string;
   updatedAt: string;
 }

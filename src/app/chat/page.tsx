@@ -25,13 +25,13 @@ export default function NewChatPage() {
         role: 'user',
         content,
       };
-      
+
       const updatedMessages = [...messages, userMessage];
       setMessages(updatedMessages);
 
       // 初期の空のアシスタントメッセージを追加（ストリーミング用）
       setStreamingContent("");
-      
+
       // APIリクエスト（ストリーミングモード）
       const response = await fetch('/api/conversation', {
         method: 'POST',
@@ -97,6 +97,7 @@ export default function NewChatPage() {
           id: newConversationId,
           title,
           messages: [...updatedMessages, { role: 'assistant', content: finalContent }],
+          model: model || selectedModel, // モデル情報を保存
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };

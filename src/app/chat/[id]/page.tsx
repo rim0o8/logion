@@ -1,6 +1,7 @@
 'use client';
 
 import { ChatContainer } from "@/components/chat/ChatContainer";
+import { DEFAULT_MODEL } from "@/config/llm";
 import type { Message } from "@/lib/llm/types";
 import type { Conversation } from "@/lib/storage";
 import { getConversation, saveConversation } from "@/lib/storage";
@@ -17,6 +18,7 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState<string | null>(null);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL);
 
   // 会話データを読み込み
   useEffect(() => {
@@ -25,6 +27,10 @@ export default function ChatPage() {
       if (conv) {
         setConversation(conv);
         setMessages(conv.messages);
+        // 保存されているモデルがあれば、それを使用
+        if (conv.model) {
+          setSelectedModel(conv.model);
+        }
       } else {
         // 会話が見つからない場合は新しいチャットページにリダイレクト
         router.push('/chat');
@@ -41,15 +47,17 @@ export default function ChatPage() {
       const updatedConversation: Conversation = {
         ...conversation,
         messages,
+        model: selectedModel, // モデル情報を保存
         updatedAt: new Date().toISOString()
       };
       saveConversation(updatedConversation);
     }
-  }, [messages, conversation]);
+  }, [messages, conversation, selectedModel]);
 
-  const handleSendMessage = async (content: string) => {
+  const handleSendMessage = async (content: string, model?: string) => {
     try {
       setIsLoading(true);
+      const modelToUse = model || selectedModel;
 
       // ユーザーメッセージを追加
       const userMessage: Message = {
@@ -70,6 +78,7 @@ export default function ChatPage() {
         body: JSON.stringify({
           messages: [...messages, userMessage],
           stream: true,
+          model: modelToUse, // モデルを指定
         }),
       });
 
@@ -119,6 +128,11 @@ export default function ChatPage() {
     }
   };
 
+  // モデルを変更する関数
+  const handleModelChange = (modelId: string) => {
+    setSelectedModel(modelId);
+  };
+
   // 表示用のメッセージ配列を作成（通常のメッセージ + ストリーミング中のメッセージ）
   const displayMessages = [...messages];
   if (streamingContent !== null) {
@@ -146,6 +160,8 @@ export default function ChatPage() {
         messages={displayMessages}
         onSendMessage={handleSendMessage}
         isLoading={isLoading}
+        selectedModel={selectedModel}
+        onSelectModel={handleModelChange}
       />
     </main>
   );
