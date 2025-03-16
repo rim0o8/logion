@@ -53,7 +53,7 @@ export function Markdown({ content, className }: MarkdownProps) {
         try {
           const mermaidModule = await import('mermaid');
           const { default: mermaid } = mermaidModule;
-          
+
           mermaid.initialize({
             startOnLoad: false,
             theme: isDark ? 'dark' : 'default',
@@ -132,15 +132,15 @@ export function Markdown({ content, className }: MarkdownProps) {
             }
 
             return (
-              <div className="my-4 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
-                <div className="flex items-center justify-between bg-gray-100 dark:bg-gray-800 px-4 py-2 text-xs text-gray-700 dark:text-gray-300">
-                  <span>{language.toUpperCase()}</span>
+              <div className="my-4 overflow-hidden rounded-lg">
+                <div className="flex items-center justify-between bg-gradient-to-r from-blue-500 to-indigo-600 px-4 py-2 text-xs text-white">
+                  <span className="font-mono font-medium">{language.toUpperCase()}</span>
                   <button
                     type="button"
                     onClick={() => {
                       navigator.clipboard.writeText(codeContent);
                     }}
-                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                    className="text-white/80 hover:text-white transition-colors duration-200"
                   >
                     Copy
                   </button>
@@ -153,6 +153,7 @@ export function Markdown({ content, className }: MarkdownProps) {
                     margin: 0,
                     borderRadius: 0,
                     padding: '1rem',
+                    backgroundColor: isDark ? '#1a1b26' : '#f8f9fc',
                   }}
                 >
                   {codeContent}
