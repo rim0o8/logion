@@ -18,9 +18,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ja" suppressHydrationWarning>
-      <body className={cn(inter.className, "min-h-screen bg-background")}>
+      <body className={cn(inter.className, "min-h-screen bg-background flex flex-col")}>
         <AuthProviders>
-          {children}
+          <div className="flex-grow">
+            {children}
+          </div>
         </AuthProviders>
       </body>
     </html>

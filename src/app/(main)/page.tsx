@@ -25,6 +25,15 @@ export default function Home() {
           </Button>
         </Link>
       </div>
+      
+      <div className="mt-16 text-sm text-gray-500 flex gap-4">
+        <Link href="/privacy-policy" className="hover:underline">
+          プライバシーポリシー
+        </Link>
+        <Link href="/terms" className="hover:underline">
+          利用規約
+        </Link>
+      </div>
     </main>
   );
 } 
