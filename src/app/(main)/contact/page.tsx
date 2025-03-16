@@ -54,13 +54,13 @@ ${status === 'success'
   return (
     <div className="container mx-auto py-10">
       <h1 className="text-3xl font-bold mb-6">お問い合わせ</h1>
-      
+
       {status !== 'idle' && (
         <Card className="p-6 mb-6">
           <Markdown content={getMarkdownContent()} />
         </Card>
       )}
-      
+
       <ContactForm onSubmit={handleSubmit} />
     </div>
   );
