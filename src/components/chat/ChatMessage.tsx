@@ -1,7 +1,7 @@
 import type { Message } from "@/lib/llm/types";
 import { cn } from "@/lib/utils";
 import { Bot, User } from "lucide-react";
-import ReactMarkdown from "react-markdown";
+import { Markdown } from "../ui/markdown";
 
 interface ChatMessageProps {
   message: Message;
@@ -32,9 +32,7 @@ export function ChatMessage({ message, isLoading }: ChatMessageProps) {
           <p className="whitespace-pre-wrap">{message.content}</p>
         ) : (
           <>
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              <ReactMarkdown>{message.content}</ReactMarkdown>
-            </div>
+            <Markdown content={message.content} />
 
             {isLoading && message.content.length === 0 && (
               <div className="flex items-center space-x-2 mt-2">
