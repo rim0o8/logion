@@ -1,8 +1,8 @@
 'use client';
 
 import { ContactForm } from '@/components/ContactForm';
+import { Markdown } from '@/components/ui/Markdown';
 import { Card } from '@/components/ui/card';
-import { Markdown } from '@/components/ui/markdown';
 import { useState } from 'react';
 
 export default function ContactPage() {

@@ -1,7 +1,7 @@
 import type { Message } from "@/lib/llm/types";
 import { cn } from "@/lib/utils";
 import { Bot, User } from "lucide-react";
-import { Markdown } from "../ui/markdown";
+import { Markdown } from "../ui/Markdown";
 
 interface ChatMessageProps {
   message: Message;
