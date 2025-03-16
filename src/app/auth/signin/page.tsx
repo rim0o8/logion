@@ -1,5 +1,6 @@
 'use client';
 
+import { GoogleIcon } from "@/components/icons/GoogleIcon";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -116,11 +117,12 @@ export default function SignInPage() {
           <Button
             variant="outline"
             type="button"
-            className="w-full"
+            className="w-full flex items-center justify-center gap-2"
             onClick={handleGoogleSignIn}
             disabled={isLoading}
           >
-            Googleでログイン
+            <GoogleIcon />
+            <span>Googleでログイン</span>
           </Button>
         </CardContent>
         <CardFooter className="flex flex-col space-y-2">
