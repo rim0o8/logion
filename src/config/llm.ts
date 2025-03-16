@@ -3,9 +3,24 @@ import type { LLMConfig } from "@/lib/llm/types";
 export const DEFAULT_MODEL = "gpt-4-turbo-preview";
 
 export const AVAILABLE_MODELS = [
-  { id: "gpt-4-turbo-preview", name: "GPT-4 Turbo", description: "最新のGPT-4モデル" },
-  { id: "gpt-4", name: "GPT-4", description: "高性能な推論能力を持つモデル" },
-  { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo", description: "バランスの取れた高速なモデル" },
+  { 
+    id: "gpt-4-turbo-preview", 
+    name: "GPT-4 Turbo", 
+    description: "最新のGPT-4モデル",
+    costFactor: 1.0  // 最も高価なモデル
+  },
+  { 
+    id: "gpt-4", 
+    name: "GPT-4", 
+    description: "高性能な推論能力を持つモデル",
+    costFactor: 0.8
+  },
+  { 
+    id: "gpt-3.5-turbo", 
+    name: "GPT-3.5 Turbo", 
+    description: "バランスの取れた高速なモデル",
+    costFactor: 0.3  // 最も安価なモデル
+  },
 ] as const;
 
 export const DEFAULT_CONFIG: LLMConfig = {

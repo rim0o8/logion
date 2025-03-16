@@ -1,13 +1,14 @@
 'use client';
 
+import { DummyInterstitialAd } from "@/components/ads/DummyInterstitialAd";
 import { ChatContainer } from "@/components/chat/ChatContainer";
 import { DEFAULT_MODEL } from "@/config/llm";
+import { useInterstitialAd } from '@/lib/ads/webAdManager';
 import type { Message } from "@/lib/llm/types";
 import type { Conversation } from "@/lib/storage";
 import { generateConversationId, generateTitle, saveConversation } from "@/lib/storage";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-
 
 export default function NewChatPage() {
   const router = useRouter();
@@ -15,6 +16,7 @@ export default function NewChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL);
+  const { loaded, showInterstitial, isVisible, closeInterstitial, isDummyAd, modelId } = useInterstitialAd(selectedModel);
 
   const handleSendMessage = async (content: string, model?: string) => {
     try {
@@ -25,13 +27,13 @@ export default function NewChatPage() {
         role: 'user',
         content,
       };
-
+      
       const updatedMessages = [...messages, userMessage];
       setMessages(updatedMessages);
 
       // 初期の空のアシスタントメッセージを追加（ストリーミング用）
       setStreamingContent("");
-
+      
       // APIリクエスト（ストリーミングモード）
       const response = await fetch('/api/conversation', {
         method: 'POST',
@@ -108,6 +110,11 @@ export default function NewChatPage() {
         router.push(`/chat/${newConversationId}`);
       }
 
+      // 会話が完了したらインタースティシャル広告を表示する可能性
+      if (loaded) {
+        showInterstitial();
+      }
+
     } catch (error) {
       console.error('エラー:', error);
       alert('メッセージの送信に失敗しました');
@@ -134,6 +141,14 @@ export default function NewChatPage() {
         selectedModel={selectedModel}
         onSelectModel={setSelectedModel}
       />
+      
+      {/* インタースティシャル広告 */}
+      {isVisible && isDummyAd && (
+        <DummyInterstitialAd 
+          onClose={closeInterstitial}
+          modelId={modelId}
+        />
+      )}
     </main>
   );
 } 

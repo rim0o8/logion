@@ -1,7 +1,9 @@
 'use client';
 
+import { DummyInterstitialAd } from "@/components/ads/DummyInterstitialAd";
 import { ChatContainer } from "@/components/chat/ChatContainer";
 import { DEFAULT_MODEL } from "@/config/llm";
+import { useInterstitialAd } from '@/lib/ads/webAdManager';
 import type { Message } from "@/lib/llm/types";
 import type { Conversation } from "@/lib/storage";
 import { getConversation, saveConversation } from "@/lib/storage";
@@ -19,6 +21,7 @@ export default function ChatPage() {
   const [streamingContent, setStreamingContent] = useState<string | null>(null);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL);
+  const { loaded, showInterstitial, isVisible, closeInterstitial, isDummyAd, modelId } = useInterstitialAd(selectedModel);
 
   // 会話データを読み込み
   useEffect(() => {
@@ -120,6 +123,11 @@ export default function ChatPage() {
         }
       }
 
+      // 会話が完了したらインタースティシャル広告を表示する可能性
+      if (loaded) {
+        showInterstitial();
+      }
+
     } catch (error) {
       console.error('エラー:', error);
       alert('メッセージの送信に失敗しました');
@@ -163,6 +171,14 @@ export default function ChatPage() {
         selectedModel={selectedModel}
         onSelectModel={handleModelChange}
       />
+      
+      {/* インタースティシャル広告 */}
+      {isVisible && isDummyAd && (
+        <DummyInterstitialAd 
+          onClose={closeInterstitial}
+          modelId={modelId}
+        />
+      )}
     </main>
   );
 } 

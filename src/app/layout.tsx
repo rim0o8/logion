@@ -1,13 +1,12 @@
+import { AdInitializer } from "@/components/ads/AdInitializer";
 import { Sidebar } from "@/components/layout/Sidebar";
-import { Suspense } from "react";
-
-import type { Metadata } from "next";
-
-import { Inter } from "next/font/google";
-import "./globals.css";
-
 import { ThemeProvider } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import { Suspense } from "react";
+import "./globals.css";
+
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -40,12 +39,15 @@ export default function RootLayout({
                 <div className="flex-1" />
               </div>
             </header>
-            
+
             <main className="container mx-auto pt-4 pb-10">
               <Suspense fallback={<div className="flex items-center justify-center h-[calc(100vh-3.5rem)]"><div className="animate-pulse text-foreground">Loading...</div></div>}>
                 {children}
               </Suspense>
             </main>
+
+            {/* 広告初期化 */}
+            <AdInitializer />
           </div>
         </ThemeProvider>
       </body>

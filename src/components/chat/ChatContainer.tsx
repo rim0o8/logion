@@ -1,10 +1,13 @@
-
-import { DEFAULT_MODEL } from "@/config/llm";
+import { DEFAULT_MODEL } from '@/config/llm';
+import { useBannerAd } from '@/lib/ads/webAdManager';
 import type { Message } from "@/lib/llm/types";
 import { useEffect, useRef } from "react";
+import { DummyBannerAd } from "../ads/DummyBannerAd";
+import { WebBannerAd } from "../ads/WebBannerAd";
 import { ChatInput } from "./ChatInput";
 import { ChatMessage } from "./ChatMessage";
 import { ModelSelector } from "./ModelSelector";
+
 interface ChatContainerProps {
   messages: Message[];
   onSendMessage: (content: string, model?: string) => void;
@@ -28,17 +31,17 @@ export function ChatContainer({
     const handleUpdate = () => {
       scrollToBottom();
     };
-    
+
     handleUpdate();
-    
+
     // messagesやisLoadingが変更されたときにスクロールする
     const observer = new MutationObserver(handleUpdate);
     const container = scrollContainerRef.current;
-    
+
     if (container) {
       observer.observe(container, { childList: true, subtree: true });
     }
-    
+
     return () => observer.disconnect();
   }, []); // 依存配列を空にする
 
@@ -48,6 +51,19 @@ export function ChatContainer({
 
   const handleSendMessage = (content: string) => {
     onSendMessage(content, selectedModel);
+  };
+
+  // 広告表示ロジック
+  const { showAd, adUnitId, isDummyAd, rotationInterval } = useBannerAd(selectedModel);
+
+  // 広告表示位置の決定
+  const shouldShowAdAfterMessage = (index: number, message: Message) => {
+    if (!showAd || messages.length === 0) return false;
+    
+    // 現在のメッセージがAIの発言で、次のメッセージがない、または次のメッセージがユーザーの発言の場合に広告を表示
+    return message.role === 'assistant' && 
+           (index === messages.length - 1 || 
+            (index + 1 < messages.length && messages[index + 1].role === 'user'));
   };
 
   return (
@@ -78,11 +94,33 @@ export function ChatContainer({
           ) : (
             <div className="px-4 space-y-2">
               {messages.map((message, index) => (
-                <ChatMessage
-                  key={`${message.content.slice(0, 10)}-${index}`}
-                  message={message}
-                  isLoading={index === messages.length - 1 && isLoading && message.role === 'assistant'}
-                />
+                <div key={`${message.content.slice(0, 10)}-${index}`}>
+                  <ChatMessage
+                    message={message}
+                    isLoading={index === messages.length - 1 && isLoading && message.role === 'assistant'}
+                  />
+                  
+                  {/* 設定に基づいて広告を表示 */}
+                  {showAd && message.role === 'assistant' && (
+                    (index === messages.length - 1 || 
+                     (index + 1 < messages.length && messages[index + 1].role === 'user')) ? (
+                      <div className="w-full flex justify-center my-3">
+                        {isDummyAd ? (
+                          <DummyBannerAd
+                            className="w-full max-w-3xl"
+                            modelId={selectedModel}
+                            rotationInterval={rotationInterval}
+                          />
+                        ) : (
+                          <WebBannerAd
+                            adUnitId={adUnitId}
+                            className="w-full max-w-md h-16"
+                          />
+                        )}
+                      </div>
+                    ) : null
+                  )}
+                </div>
               ))}
               <div ref={messagesEndRef} className="h-4" />
             </div>
