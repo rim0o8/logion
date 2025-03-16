@@ -21,7 +21,7 @@ export function ChatMessage({ message, isLoading }: ChatMessageProps) {
           <Bot className="h-5 w-5 text-primary-foreground" />
         </div>
       )}
-      
+
       <div className={cn(
         "rounded-2xl px-4 py-3 max-w-[85%] break-words",
         isUser 
@@ -35,8 +35,8 @@ export function ChatMessage({ message, isLoading }: ChatMessageProps) {
             <div className="prose prose-sm dark:prose-invert max-w-none">
               <ReactMarkdown>{message.content}</ReactMarkdown>
             </div>
-            
-            {isLoading && (
+
+            {isLoading && message.content.length === 0 && (
               <div className="flex items-center space-x-2 mt-2">
                 <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
                 <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '200ms' }} />
