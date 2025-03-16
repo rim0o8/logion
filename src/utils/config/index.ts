@@ -40,6 +40,7 @@ interface ConfigType {
     NEXT_PUBLIC_DUMMY_ADS: boolean;
     NEXT_PUBLIC_ADMOB_BANNER_ID: string;
     NODE_ENV: string;
+    SLACK_WEBHOOK_URL: string;
 }
 
 const config: ConfigType = {
@@ -60,6 +61,7 @@ const config: ConfigType = {
     NEXT_PUBLIC_DUMMY_ADS: CheckEnv('NEXT_PUBLIC_DUMMY_ADS', process.env.NEXT_PUBLIC_DUMMY_ADS) === 'true',
     NEXT_PUBLIC_ADMOB_BANNER_ID: CheckEnv('NEXT_PUBLIC_ADMOB_BANNER_ID', process.env.NEXT_PUBLIC_ADMOB_BANNER_ID),
     NODE_ENV: CheckEnv('NODE_ENV', process.env.NODE_ENV),
+    SLACK_WEBHOOK_URL: GetEnv('SLACK_WEBHOOK_URL', true),
 };
 
 export const Config = ((): ConfigType => {

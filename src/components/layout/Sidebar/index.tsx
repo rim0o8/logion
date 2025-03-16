@@ -10,12 +10,14 @@ import {
 } from "@/components/ui/sheet";
 
 import { Menu, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ConversationList } from "./ConversationList";
 import { ModeToggle } from "./ModeToggle";
 
 export const Sidebar: React.FC = () => {
     const [open, setOpen] = useState(false);
+    const router = useRouter();
     
     return (
         <Sheet open={open} onOpenChange={setOpen}>
@@ -60,6 +62,18 @@ export const Sidebar: React.FC = () => {
                 
                 <div className="flex-1 overflow-y-auto py-2">
                     <ConversationList closeMenu={() => setOpen(false)} />
+                    <div className="mt-4 px-4">
+                        <Button 
+                            variant="outline"
+                            className="w-full"
+                            onClick={() => {
+                                setOpen(false);
+                                router.push("/contact");
+                            }}
+                        >
+                            お問い合わせ
+                        </Button>
+                    </div>
                 </div>
                 
                 <div className="border-t p-4 flex items-center justify-between">
