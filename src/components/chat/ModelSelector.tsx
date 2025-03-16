@@ -5,7 +5,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { AVAILABLE_MODELS } from "@/config/llm";
+import { AVAILABLE_MODELS, MODEL_PROVIDERS } from "@/config/llm";
 import { ChevronDown } from "lucide-react";
 
 interface ModelSelectorProps {
@@ -14,28 +14,35 @@ interface ModelSelectorProps {
 }
 
 export function ModelSelector({ selectedModel, onSelectModel }: ModelSelectorProps) {
-  // 選択されているモデルの名前を取得
-  const selectedModelName = AVAILABLE_MODELS.find(model => model.id === selectedModel)?.name || selectedModel;
+  const selectedModelInfo = AVAILABLE_MODELS.find(model => model.id === selectedModel);
+  const isClaudeModel = (MODEL_PROVIDERS.CLAUDE as readonly string[]).includes(selectedModel);
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="h-8 gap-1">
-          <span className="text-xs font-normal">{selectedModelName}</span>
-          <ChevronDown className="h-3 w-3 opacity-50" />
+        <Button variant="outline" className="flex items-center gap-2">
+          <span className={`h-2 w-2 rounded-full ${isClaudeModel ? 'bg-purple-500' : 'bg-green-500'}`} />
+          <span>{selectedModelInfo?.name || selectedModel}</span>
+          <ChevronDown className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[200px]">
-        {AVAILABLE_MODELS.map((model) => (
-          <DropdownMenuItem
-            key={model.id}
-            onClick={() => onSelectModel(model.id)}
-            className="flex flex-col items-start"
-          >
-            <span className="font-medium">{model.name}</span>
-            <span className="text-xs text-muted-foreground">{model.description}</span>
-          </DropdownMenuItem>
-        ))}
+      <DropdownMenuContent align="end">
+        {AVAILABLE_MODELS.map((model) => {
+          const isClaudeModel = (MODEL_PROVIDERS.CLAUDE as readonly string[]).includes(model.id);
+          return (
+            <DropdownMenuItem
+              key={model.id}
+              onClick={() => onSelectModel(model.id)}
+              className="flex items-center gap-2"
+            >
+              <span className={`h-2 w-2 rounded-full ${isClaudeModel ? 'bg-purple-500' : 'bg-green-500'}`} />
+              <div>
+                <div className="font-medium">{model.name}</div>
+                <div className="text-xs text-muted-foreground">{model.description}</div>
+              </div>
+            </DropdownMenuItem>
+          );
+        })}
       </DropdownMenuContent>
     </DropdownMenu>
   );

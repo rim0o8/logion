@@ -2,7 +2,7 @@
 
 import { tw } from '@/lib/tailwindcss';
 import { useTheme } from 'next-themes';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
 // 言語のサポートを追加
@@ -132,7 +132,7 @@ export function Markdown({ content, className }: MarkdownProps) {
             // language-xxxx から言語を抽出
             const match = /language-(\w+)/.exec(className);
             const language = match ? match[1] : '';
-            const codeContent = String(children).replace(/\n$/, '');
+            const codeContent = useMemo(() => String(children).replace(/\n$/, ''), [children]);
 
             // Mermaidダイアグラムの場合
             if (language === 'mermaid' && mermaidSvg[codeContent]) {

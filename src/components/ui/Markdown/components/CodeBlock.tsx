@@ -14,7 +14,7 @@ export function CodeBlock({ language, codeContent }: CodeBlockProps) {
   const isDark = resolvedTheme === 'dark';
 
   return (
-    <div className="my-4 overflow-hidden rounded-lg">
+    <div className="overflow-y-hidden rounded-lg">
       <div className="flex items-center justify-between bg-gradient-to-r from-blue-500 to-indigo-600 px-4 py-2 text-xs text-white">
         <span className="font-mono font-medium">{language.toUpperCase()}</span>
         <button
