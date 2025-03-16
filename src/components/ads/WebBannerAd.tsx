@@ -18,15 +18,14 @@ export function WebBannerAd({ adUnitId, className = '' }: WebBannerAdProps) {
   useEffect(() => {
     // Google AdSenseスクリプトを動的に読み込む
     const script = document.createElement('script');
-    script.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js';
+    script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adUnitId}`;
     script.async = true;
-    script.setAttribute('data-ad-client', adUnitId);
+    script.crossOrigin = "anonymous";
     document.head.appendChild(script);
 
     // 広告を初期化
     if (adContainerRef.current && window.adsbygoogle) {
       try {
-        // 広告を初期化
         const adsbyGoogle = window.adsbygoogle || [];
         adsbyGoogle.push({});
         window.adsbygoogle = adsbyGoogle;
@@ -36,7 +35,6 @@ export function WebBannerAd({ adUnitId, className = '' }: WebBannerAdProps) {
     }
 
     return () => {
-      // クリーンアップ
       if (document.head.contains(script)) {
         document.head.removeChild(script);
       }
@@ -45,14 +43,18 @@ export function WebBannerAd({ adUnitId, className = '' }: WebBannerAdProps) {
 
   return (
     <div ref={adContainerRef} className={className}>
-      <ins
+      {/* <ins
         className="adsbygoogle"
         style={{ display: 'block' }}
         data-ad-client={adUnitId}
         data-ad-slot="1234567890"
         data-ad-format="auto"
         data-full-width-responsive="true"
-      />
+      /> */}
+      <script 
+        async 
+        src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adUnitId}`}
+        crossOrigin="anonymous" />
     </div>
   );
 } 
