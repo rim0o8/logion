@@ -1,3 +1,4 @@
+import GoogleAnalytics from "@/lib/analytics";
 import { cn } from "@/lib/utils";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
@@ -19,6 +20,7 @@ export default function RootLayout({
   return (
     <html lang="ja" suppressHydrationWarning>
       <body className={cn(inter.className, "min-h-screen bg-background flex flex-col")}>
+        <GoogleAnalytics />
         <AuthProviders>
           <div className="flex-grow">
             {children}
