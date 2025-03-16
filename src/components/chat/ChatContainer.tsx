@@ -1,5 +1,4 @@
 import type { Message } from "@/lib/llm/types";
-import { Bot } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { ChatInput } from "./ChatInput";
 import { ChatMessage } from "./ChatMessage";
@@ -67,22 +66,6 @@ export function ChatContainer({
                   isLoading={index === messages.length - 1 && isLoading && message.role === 'assistant'}
                 />
               ))}
-
-              {/* ユーザーメッセージの後にAIの応答待ちアニメーションを表示 */}
-              {isLoading && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
-                <div className="flex items-start gap-4 py-4">
-                  <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center shrink-0">
-                    <Bot className="h-5 w-5 text-primary-foreground" />
-                  </div>
-                  <div className="rounded-2xl px-4 py-3 bg-card border shadow-sm dark:border-border dark:shadow-none">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '200ms' }} />
-                      <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '400ms' }} />
-                    </div>
-                  </div>
-                </div>
-              )}
               <div ref={messagesEndRef} className="h-4" />
             </div>
           )}
