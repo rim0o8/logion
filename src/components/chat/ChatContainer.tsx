@@ -1,18 +1,24 @@
+
+import { DEFAULT_MODEL } from "@/config/llm";
 import type { Message } from "@/lib/llm/types";
 import { useEffect, useRef } from "react";
 import { ChatInput } from "./ChatInput";
 import { ChatMessage } from "./ChatMessage";
-
+import { ModelSelector } from "./ModelSelector";
 interface ChatContainerProps {
   messages: Message[];
-  onSendMessage: (content: string) => void;
+  onSendMessage: (content: string, model?: string) => void;
   isLoading?: boolean;
+  selectedModel?: string;
+  onSelectModel?: (modelId: string) => void;
 }
 
 export function ChatContainer({
   messages,
   onSendMessage,
   isLoading,
+  selectedModel = DEFAULT_MODEL,
+  onSelectModel,
 }: ChatContainerProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -40,6 +46,10 @@ export function ChatContainer({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const handleSendMessage = (content: string) => {
+    onSendMessage(content, selectedModel);
+  };
+
   return (
     <div className="flex flex-col h-full bg-background">
       {/* メッセージエリア */}
@@ -56,6 +66,14 @@ export function ChatContainer({
               <p className="text-muted-foreground max-w-md">
                 何でもお気軽にお尋ねください。情報提供、問題解決、アイデア出しなどをサポートします。
               </p>
+              {onSelectModel && (
+                <div className="mt-4">
+                  <ModelSelector 
+                    selectedModel={selectedModel} 
+                    onSelectModel={onSelectModel} 
+                  />
+                </div>
+              )}
             </div>
           ) : (
             <div className="px-4 space-y-2">
@@ -75,7 +93,15 @@ export function ChatContainer({
       {/* 入力エリア */}
       <div className="fixed bottom-0 left-0 right-0 bg-background border-t z-10 dark:border-border">
         <div className="max-w-3xl mx-auto p-4">
-          <ChatInput onSubmit={onSendMessage} isLoading={isLoading} />
+          <div className="flex items-center gap-2 mb-2">
+            {onSelectModel && (
+              <ModelSelector 
+                selectedModel={selectedModel} 
+                onSelectModel={onSelectModel} 
+              />
+            )}
+          </div>
+          <ChatInput onSubmit={handleSendMessage} isLoading={isLoading} />
           <div className="mt-2 text-xs text-center text-muted-foreground">
             AIアシスタントは間違った情報を提供する可能性があります。重要な決断には必ず情報を検証してください。
           </div>

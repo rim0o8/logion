@@ -1,5 +1,6 @@
+import { DEFAULT_CONFIG } from '@/config/llm';
 import { OpenAIProvider } from '@/lib/llm/openai-provider';
-import type { Message } from '@/lib/llm/types';
+import type { LLMConfig, Message } from '@/lib/llm/types';
 import { Config } from '@/utils/config';
 import { NextResponse } from 'next/server';
 
@@ -8,6 +9,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const messages: Message[] = body.messages;
     const stream = body.stream === true;
+    const model = body.model || DEFAULT_CONFIG.model;
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json(
@@ -17,17 +19,21 @@ export async function POST(request: Request) {
     }
 
     const llmProvider = new OpenAIProvider(Config.OPENAI_API_KEY);
+    const config: LLMConfig = {
+      ...DEFAULT_CONFIG,
+      model,
+    };
 
     // ストリーミングモードの場合
     if (stream) {
       const encoder = new TextEncoder();
-      const streamGenerator = llmProvider.streamMessage(messages);
-      
+      const streamGenerator = llmProvider.streamMessage(messages, config);
+
       const readableStream = new ReadableStream({
         async start(controller) {
           try {
             let finalContent = '';
-            
+
             for await (const chunk of streamGenerator) {
               finalContent = chunk.content;
               const encodedChunk = encoder.encode(`${JSON.stringify({ 
@@ -66,7 +72,7 @@ export async function POST(request: Request) {
     }
     
     // 通常モード
-    const response = await llmProvider.sendMessage(messages);
+    const response = await llmProvider.sendMessage(messages, config);
     return NextResponse.json({
       messages: [...messages, response]
     });
@@ -78,4 +84,4 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-} 
+}

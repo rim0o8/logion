@@ -2,6 +2,12 @@ import type { LLMConfig } from "@/lib/llm/types";
 
 export const DEFAULT_MODEL = "gpt-4-turbo-preview";
 
+export const AVAILABLE_MODELS = [
+  { id: "gpt-4-turbo-preview", name: "GPT-4 Turbo", description: "最新のGPT-4モデル" },
+  { id: "gpt-4", name: "GPT-4", description: "高性能な推論能力を持つモデル" },
+  { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo", description: "バランスの取れた高速なモデル" },
+] as const;
+
 export const DEFAULT_CONFIG: LLMConfig = {
   model: DEFAULT_MODEL,
   temperature: 0.7,

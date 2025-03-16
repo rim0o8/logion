@@ -1,19 +1,22 @@
 'use client';
 
 import { ChatContainer } from "@/components/chat/ChatContainer";
+import { DEFAULT_MODEL } from "@/config/llm";
 import type { Message } from "@/lib/llm/types";
 import type { Conversation } from "@/lib/storage";
 import { generateConversationId, generateTitle, saveConversation } from "@/lib/storage";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+
 export default function NewChatPage() {
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL);
 
-  const handleSendMessage = async (content: string) => {
+  const handleSendMessage = async (content: string, model?: string) => {
     try {
       setIsLoading(true);
 
@@ -38,6 +41,7 @@ export default function NewChatPage() {
         body: JSON.stringify({
           messages: updatedMessages,
           stream: true,
+          model: model || selectedModel, // モデルを指定
         }),
       });
 
@@ -126,6 +130,8 @@ export default function NewChatPage() {
         messages={displayMessages}
         onSendMessage={handleSendMessage}
         isLoading={isLoading}
+        selectedModel={selectedModel}
+        onSelectModel={setSelectedModel}
       />
     </main>
   );
