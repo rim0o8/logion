@@ -37,6 +37,7 @@ interface ConfigType {
     WITH_AUTH: boolean;
     OPENAI_API_KEY: string;
     ANTHROPIC_API_KEY: string;
+    DEEPSEEK_API_KEY: string;
     NEXT_PUBLIC_DUMMY_ADS: boolean;
     NEXT_PUBLIC_ADMOB_BANNER_ID: string;
     NODE_ENV: string;
@@ -59,6 +60,7 @@ const config: ConfigType = {
     WITH_AUTH: GetEnv('WITH_AUTH', true) === 'true',
     OPENAI_API_KEY: GetEnv('OPENAI_API_KEY', true),
     ANTHROPIC_API_KEY: GetEnv('ANTHROPIC_API_KEY', true),
+    DEEPSEEK_API_KEY: GetEnv('DEEPSEEK_API_KEY', true),
     NEXT_PUBLIC_DUMMY_ADS: CheckEnv('NEXT_PUBLIC_DUMMY_ADS', process.env.NEXT_PUBLIC_DUMMY_ADS) === 'true',
     NEXT_PUBLIC_ADMOB_BANNER_ID: CheckEnv('NEXT_PUBLIC_ADMOB_BANNER_ID', process.env.NEXT_PUBLIC_ADMOB_BANNER_ID),
     NODE_ENV: CheckEnv('NODE_ENV', process.env.NODE_ENV),

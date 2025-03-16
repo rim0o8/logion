@@ -1,5 +1,6 @@
 import { DEFAULT_CONFIG, getModelProvider } from '@/config/llm';
 import { ClaudeProvider } from '@/lib/llm/claude-provider';
+import { DeepSeekProvider } from '@/lib/llm/deepseek-provider';
 import { OpenAIProvider } from '@/lib/llm/openai-provider';
 import type { LLMConfig, Message } from '@/lib/llm/types';
 import { Config } from '@/utils/config';
@@ -21,9 +22,12 @@ export async function POST(request: Request) {
 
     // モデルに基づいて適切なプロバイダーを選択
     const provider = getModelProvider(model);
-    const llmProvider = provider === 'anthropic' 
-      ? new ClaudeProvider(Config.ANTHROPIC_API_KEY)
-      : new OpenAIProvider(Config.OPENAI_API_KEY);
+    const llmProvider = 
+      provider === 'anthropic' 
+        ? new ClaudeProvider(Config.ANTHROPIC_API_KEY)
+        : provider === 'deepseek'
+          ? new DeepSeekProvider(Config.DEEPSEEK_API_KEY)
+          : new OpenAIProvider(Config.OPENAI_API_KEY);
       
     const config: LLMConfig = {
       ...DEFAULT_CONFIG,
