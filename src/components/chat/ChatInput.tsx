@@ -19,6 +19,14 @@ export function ChatInput({ onSubmit, isLoading, modelId }: ChatInputProps) {
   // モデルが画像入力をサポートしているかを確認
   const imageInputSupported = supportsImageInput(modelId);
 
+  // モデルが変更された時に、画像入力不可モデルに変更された場合は画像をクリア
+  useEffect(() => {
+    if (!imageInputSupported && images.length > 0) {
+      // 画像をクリア
+      setImages([]);
+    }
+  }, [imageInputSupported, images.length]);
+
   // テキストエリアの高さを自動調整する関数
   const autoResizeTextarea = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const textarea = e.target;
