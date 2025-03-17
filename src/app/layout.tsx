@@ -1,5 +1,6 @@
 import GoogleAnalytics from "@/lib/analytics";
 import { cn } from "@/lib/utils";
+import VercelAnalytics from "@/lib/vercel-analytics";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { AuthProviders } from './auth/providers';
@@ -21,6 +22,7 @@ export default function RootLayout({
     <html lang="ja" suppressHydrationWarning>
       <body className={cn(inter.className, "min-h-screen bg-background flex flex-col")}>
         <GoogleAnalytics />
+        <VercelAnalytics />
         <AuthProviders>
           <div className="flex-grow">
             {children}
