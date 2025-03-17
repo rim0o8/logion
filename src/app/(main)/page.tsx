@@ -1,14 +1,15 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { AVAILABLE_MODELS } from "@/config/llm";
+import { AVAILABLE_MODELS, getModelProvider } from "@/config/llm";
 import { Bot, Cpu, Sparkles } from "lucide-react";
 import Link from "next/link";
 
 export default function Home() {
   // プロバイダーごとのモデル数をカウント
   const providerCounts = AVAILABLE_MODELS.reduce((acc, model) => {
-    acc[model.provider] = (acc[model.provider] || 0) + 1;
+    const provider = getModelProvider(model.id);
+    acc[provider] = (acc[provider] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
