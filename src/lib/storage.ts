@@ -115,8 +115,29 @@ export function generateTitle(messages: Message[]): string {
   const firstUserMessage = messages.find(m => m.role === 'user');
   if (!firstUserMessage) return '新しい会話';
   
-  const content = firstUserMessage.content.trim();
-  if (content.length <= 30) return content;
+  // 文字列形式のコンテンツの場合
+  if (typeof firstUserMessage.content === 'string') {
+    const content = firstUserMessage.content.trim();
+    if (content.length <= 30) return content;
+    return `${content.substring(0, 30)}...`;
+  }
   
-  return `${content.substring(0, 30)}...`;
+  // 配列形式のコンテンツの場合（マルチモーダル）
+  if (Array.isArray(firstUserMessage.content)) {
+    // テキスト要素を探す
+    const textItem = firstUserMessage.content.find(item => item.type === 'text' && item.text);
+    if (textItem && textItem.type === 'text' && textItem.text) {
+      const content = textItem.text.trim();
+      if (content.length <= 30) return content;
+      return `${content.substring(0, 30)}...`;
+    }
+    
+    // 画像要素があるか確認
+    const hasImage = firstUserMessage.content.some(item => item.type === 'image_url');
+    if (hasImage) {
+      return '画像を含む会話';
+    }
+  }
+  
+  return '新しい会話';
 } 

@@ -67,7 +67,8 @@ export default function NewChatPage() {
       // ストリームの読み取り
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let finalContent = '';
+      let finalContent: MessageContent = '';
+      let assistantMessage: Message | undefined = undefined;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -87,10 +88,11 @@ export default function NewChatPage() {
               finalContent = data.content;
             } else if (data.type === 'done') {
               // 完了したメッセージを追加
-              const assistantMessage = data.message;
-              finalContent = assistantMessage.content;
-              
-              setMessages(prev => [...prev, assistantMessage]);
+              assistantMessage = data.message;
+              if (assistantMessage) {
+                finalContent = assistantMessage.content;
+                setMessages(prev => [...prev, assistantMessage as Message]);
+              }
               setStreamingContent(null);
             }
           } catch (e) {
@@ -100,14 +102,14 @@ export default function NewChatPage() {
       }
 
       // 初回メッセージの場合、新しい会話を作成して保存
-      if (messages.length === 0) {
+      if (messages.length === 0 && assistantMessage) {
         const newConversationId = generateConversationId();
         const title = generateTitle(updatedMessages);
         
         const newConversation: Conversation = {
           id: newConversationId,
           title,
-          messages: [...updatedMessages, { role: 'assistant', content: finalContent }],
+          messages: [...updatedMessages, assistantMessage],
           model: model || selectedModel, // モデル情報を保存
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
