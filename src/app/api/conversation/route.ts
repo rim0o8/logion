@@ -1,12 +1,10 @@
-import { DEFAULT_CONFIG, getModelProvider } from '@/config/llm';
-import { getLangfuse } from '@/lib/langfuse';
-import { ClaudeProvider } from '@/lib/llm/claude-provider';
-import { DeepSeekProvider } from '@/lib/llm/deepseek-provider';
-import { OpenAIProvider } from '@/lib/llm/openai-provider';
-import type { LLMConfig, Message } from '@/lib/llm/types';
-import { Config } from '@/utils/config';
+import { DEFAULT_CONFIG } from '@/config/llm';
+import { type ConversationState, type Message, createConversationGraph, createStreamingConversationGraph } from '@/lib/langchain/conversation-graph';
 import { NextResponse } from 'next/server';
 
+/**
+ * 会話APIのPOSTハンドラ
+ */
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -26,91 +24,66 @@ export async function POST(request: Request) {
       );
     }
 
-    // Langfuseのトレースを開始
-    const langfuse = getLangfuse();
-    const trace = langfuse.trace({
-      name: 'conversation',
-      userId: userId,
-      sessionId: conversationId,
-      metadata: {
-        model: model,
-        messageCount: messages.length,
-        userEmail: userEmail,
-        conversationId: conversationId
+    // 初期状態を設定
+    const initialState: ConversationState = {
+      messages,
+      modelConfig: {
+        model,
+        temperature: DEFAULT_CONFIG.temperature,
+        maxTokens: DEFAULT_CONFIG.maxTokens,
+        topP: DEFAULT_CONFIG.topP,
       },
-    });
-
-    // モデルに基づいて適切なプロバイダーを選択
-    const provider = getModelProvider(model);
-    const llmProvider = 
-      provider === 'anthropic' 
-        ? new ClaudeProvider(Config.ANTHROPIC_API_KEY)
-        : provider === 'deepseek'
-          ? new DeepSeekProvider(Config.DEEPSEEK_API_KEY)
-          : new OpenAIProvider(Config.OPENAI_API_KEY);
-      
-    const config: LLMConfig = {
-      ...DEFAULT_CONFIG,
-      model,
+      metadata: {
+        userId,
+        userEmail,
+        conversationId,
+      },
     };
 
     // ストリーミングモードの場合
     if (stream) {
       const encoder = new TextEncoder();
-      const streamGenerator = llmProvider.streamMessage(messages, config);
-
-      // Langfuseでジェネレーションを記録
-      const generation = trace.generation({
-        name: 'stream-generation',
-        model: model,
-        modelParameters: {
-          temperature: config.temperature,
-          maxTokens: config.maxTokens,
-          topP: config.topP,
-        },
-        input: JSON.stringify(messages),
-        metadata: {
-          conversationId: conversationId,
-          userEmail: userEmail
-        }
-      });
+      const streamingGraph = await createStreamingConversationGraph();
 
       const readableStream = new ReadableStream({
         async start(controller) {
           try {
-            let finalContent = '';
+            // ストリーミンググラフを実行
+            const stream = await streamingGraph.invoke(initialState);
 
-            for await (const chunk of streamGenerator) {
-              finalContent = chunk.content;
-              const encodedChunk = encoder.encode(`${JSON.stringify({ 
-                type: 'chunk', 
-                content: chunk.content 
-              })}\n`);
-              controller.enqueue(encodedChunk);
+            let lastContent = '';
+
+            for await (const chunk of stream) {
+              if (chunk.messages && chunk.messages.length > 0) {
+                const lastMessage = chunk.messages[chunk.messages.length - 1];
+                if (lastMessage.role === 'assistant') {
+                  // 前回との差分を計算
+                  const newContent = lastMessage.content;
+                  
+                  // クライアント側の実装に合わせて、完全な内容を送信
+                  const encodedChunk = encoder.encode(`${JSON.stringify({ 
+                    type: 'chunk', 
+                    content: newContent 
+                  })}\n`);
+                  controller.enqueue(encodedChunk);
+                  
+                  lastContent = newContent;
+                }
+              }
             }
-            
+
             // 完了メッセージを送信
             const finalMessage = {
               role: 'assistant',
-              content: finalContent
+              content: lastContent
             };
-            
+
             const encodedFinal = encoder.encode(`${JSON.stringify({ 
               type: 'done', 
               message: finalMessage 
             })}\n`);
             controller.enqueue(encodedFinal);
             controller.close();
-
-            // Langfuseでジェネレーションを完了
-            generation.end({
-              output: finalContent,
-            });
-
-            // バックグラウンドでフラッシュ
-            langfuse.flushAsync().catch(err => {
-              console.error('Langfuseフラッシュエラー:', err);
-            });
           } catch (error) {
             console.error('ストリーミングエラー:', error);
             controller.error(error);
@@ -126,38 +99,13 @@ export async function POST(request: Request) {
         },
       });
     }
-    
+
     // 通常モード
-    // Langfuseでジェネレーションを記録
-    const generation = trace.generation({
-      name: 'completion-generation',
-      model: model,
-      modelParameters: {
-        temperature: config.temperature,
-        maxTokens: config.maxTokens,
-        topP: config.topP,
-      },
-      input: JSON.stringify(messages),
-      metadata: {
-        conversationId: conversationId,
-        userEmail: userEmail
-      }
-    });
-
-    const response = await llmProvider.sendMessage(messages, config);
-
-    // Langfuseでジェネレーションを完了
-    generation.end({
-      output: response.content,
-    });
-
-    // バックグラウンドでフラッシュ
-    langfuse.flushAsync().catch(err => {
-      console.error('Langfuseフラッシュエラー:', err);
-    });
-
+    const graph = createConversationGraph();
+    const result = await graph.invoke(initialState);
+    
     return NextResponse.json({
-      messages: [...messages, response]
+      messages: result.messages
     });
 
   } catch (error) {
