@@ -22,7 +22,7 @@ export default function MainLayout({
           <div className="flex h-14 items-center px-4 md:px-6">
             <div className="flex items-center gap-3">
               <Sidebar />
-              <h1 className="font-bold">LLMアプリケーション</h1>
+              <h1 className="font-bold">Logion</h1>
             </div>
             <div className="flex-1" />
           </div>

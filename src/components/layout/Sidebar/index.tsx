@@ -47,7 +47,7 @@ export const Sidebar: React.FC = () => {
                         <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
                             <span className="text-primary-foreground font-bold">L</span>
                         </div>
-                        <SheetTitle className="text-xl">LLMアプリ</SheetTitle>
+                        <SheetTitle className="text-xl">Logion</SheetTitle>
                     </div>
                     <Button 
                         variant="ghost" 
