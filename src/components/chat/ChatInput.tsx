@@ -15,6 +15,7 @@ export function ChatInput({ onSubmit, isLoading, modelId }: ChatInputProps) {
   const [images, setImages] = useState<{ url: string; file: File }[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isFocused, setIsFocused] = useState(false);
   
   // モデルが画像入力をサポートしているかを確認
   const imageInputSupported = supportsImageInput(modelId);
@@ -50,6 +51,22 @@ export function ChatInput({ onSubmit, isLoading, modelId }: ChatInputProps) {
       textareaRef.current.style.height = `${newHeight}px`;
     }
   }, []);
+
+  // フォーカス時にスクロール位置を調整
+  const handleFocus = () => {
+    setIsFocused(true);
+    // モバイルでキーボードが表示された時に、少し遅延させてスクロール
+    setTimeout(() => {
+      if (textareaRef.current) {
+        // 入力エリアが見えるようにスクロール
+        textareaRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 300);
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+  };
 
   const handleSubmit = () => {
     if ((!text.trim() && images.length === 0) || isLoading) return;
@@ -126,21 +143,22 @@ export function ChatInput({ onSubmit, isLoading, modelId }: ChatInputProps) {
   };
 
   return (
-    <div className="border-t bg-background p-4">
+    <div className={`border-t bg-background p-2 sm:p-4 ${isFocused ? 'pb-4 sm:pb-6' : ''}`}>
       {/* 画像プレビュー */}
       {images.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-2">
+        <div className="flex flex-wrap gap-2 mb-3">
           {images.map((image, i) => (
             <div key={`image-${i}-${image.file.name}`} className="relative">
               <img 
                 src={image.url} 
                 alt="アップロード画像" 
-                className="h-20 w-20 object-cover rounded border"
+                className="h-16 w-16 sm:h-20 sm:w-20 object-cover rounded border"
               />
               <button
                 type="button"
                 onClick={() => removeImage(i)}
-                className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1"
+                className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1.5 touch-manipulation"
+                aria-label="画像を削除"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -156,9 +174,11 @@ export function ChatInput({ onSubmit, isLoading, modelId }: ChatInputProps) {
             value={text}
             onChange={autoResizeTextarea}
             onKeyDown={handleKeyDown}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
             placeholder="メッセージを入力..."
-            className="resize-none w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[40px] max-h-[200px]"
-            style={{ height: '40px' }}
+            className="resize-none w-full rounded-md border border-input bg-background px-3 py-2.5 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[44px] max-h-[200px]"
+            style={{ height: '44px' }}
           />
         </div>
         
@@ -170,6 +190,8 @@ export function ChatInput({ onSubmit, isLoading, modelId }: ChatInputProps) {
             variant="outline"
             onClick={() => fileInputRef.current?.click()}
             disabled={isLoading}
+            className="h-10 w-10 touch-manipulation"
+            aria-label="画像をアップロード"
           >
             <ImageIcon className="h-5 w-5" />
             <input
@@ -188,6 +210,8 @@ export function ChatInput({ onSubmit, isLoading, modelId }: ChatInputProps) {
           size="icon" 
           onClick={handleSubmit}
           disabled={(!text.trim() && images.length === 0) || isLoading}
+          className="h-10 w-10 touch-manipulation"
+          aria-label="メッセージを送信"
         >
           {isLoading ? (
             <Loader2 className="h-5 w-5 animate-spin" />

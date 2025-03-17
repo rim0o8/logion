@@ -28,24 +28,31 @@ export function ModelSelector({ selectedModel, onSelectModel }: ModelSelectorPro
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="flex items-center gap-2">
+        <Button 
+          variant="outline" 
+          className="flex items-center gap-2 h-9 px-3 py-1 text-sm sm:h-10 sm:px-4 sm:py-2 touch-manipulation"
+          aria-label="モデルを選択"
+        >
           <span className={`h-2 w-2 rounded-full ${getModelColor(selectedModel)}`} />
-          <span>{selectedModelInfo?.name || selectedModel}</span>
-          <ChevronDown className="h-4 w-4" />
+          <span className="truncate max-w-[120px] sm:max-w-[180px]">{selectedModelInfo?.name || selectedModel}</span>
+          <ChevronDown className="h-4 w-4 flex-shrink-0" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent 
+        align="start" 
+        className="w-[280px] sm:w-[320px] max-h-[60vh] overflow-y-auto"
+      >
         {AVAILABLE_MODELS.map((model) => {
           return (
             <DropdownMenuItem
               key={model.id}
               onClick={() => onSelectModel(model.id)}
-              className="flex items-center gap-2"
+              className="flex items-start gap-2 py-2 px-3 cursor-pointer touch-manipulation"
             >
-              <span className={`h-2 w-2 rounded-full ${getModelColor(model.id)}`} />
+              <span className={`h-2 w-2 rounded-full ${getModelColor(model.id)} mt-1.5 flex-shrink-0`} />
               <div>
-                <div className="font-medium">{model.name}</div>
-                <div className="text-xs text-muted-foreground">{model.description}</div>
+                <div className="font-medium text-sm">{model.name}</div>
+                <div className="text-xs text-muted-foreground line-clamp-2">{model.description}</div>
               </div>
             </DropdownMenuItem>
           );

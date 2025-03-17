@@ -66,12 +66,41 @@
   }
 }
 
+/* モバイルキーボード表示時のスタイル */
+@media (max-width: 768px) {
+  .keyboard-visible {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    transition: transform 0.3s ease;
+  }
+  
+  /* iOS向けの調整 */
+  @supports (-webkit-touch-callout: none) {
+    .pb-safe {
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    
+    .keyboard-visible {
+      transform: translateY(0);
+    }
+  }
+}
+
+/* タッチ操作の最適化 */
+.touch-manipulation {
+  touch-action: manipulation;
+}
+
 @layer base {
   * {
     @apply border-border;
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
 
