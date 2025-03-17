@@ -119,6 +119,8 @@ export function ChatContainer({
   // キーボードが表示されている時のスタイル調整
   const keyboardAdjustStyle = isKeyboardVisible ? {
     paddingBottom: `calc(${viewportHeight * 0.4}px)`,
+    height: `${viewportHeight}px`,
+    maxHeight: `${viewportHeight}px`,
   } : {};
 
   return (
@@ -185,7 +187,14 @@ export function ChatContainer({
       </div>
 
       {/* 入力エリア */}
-      <div className={`fixed bottom-0 left-0 right-0 bg-background border-t z-10 dark:border-border ${isKeyboardVisible ? 'keyboard-visible' : ''}`}>
+      <div className={`fixed bottom-0 left-0 right-0 bg-background border-t z-10 dark:border-border ${isKeyboardVisible ? 'keyboard-visible' : ''}`}
+        style={{ 
+          position: 'fixed',
+          bottom: 0,
+          width: '100%',
+          zIndex: 10
+        }}
+      >
         <div className="max-w-3xl mx-auto px-2 sm:px-4 pb-safe">
           <div className={`flex items-center justify-between gap-2 my-2 ${isKeyboardVisible ? 'hidden' : ''}`}>
             {onSelectModel && (
@@ -198,7 +207,9 @@ export function ChatContainer({
           <ChatInput 
             onSubmit={handleSendMessage} 
             isLoading={isLoading} 
-            modelId={selectedModel} 
+            modelId={selectedModel}
+            isKeyboardVisible={isKeyboardVisible}
+            viewportHeight={viewportHeight}
           />
           <div className={`mt-1 sm:mt-2 text-xs text-center text-muted-foreground px-2 pb-2 ${isKeyboardVisible ? 'hidden' : ''}`}>
             AIアシスタントは間違った情報を提供する可能性があります。重要な決断には必ず情報を検証してください。

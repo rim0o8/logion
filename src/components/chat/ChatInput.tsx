@@ -8,9 +8,11 @@ interface ChatInputProps {
   onSubmit: (content: MessageContent) => void;
   isLoading?: boolean;
   modelId: string;
+  isKeyboardVisible?: boolean;
+  viewportHeight?: number;
 }
 
-export function ChatInput({ onSubmit, isLoading, modelId }: ChatInputProps) {
+export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, viewportHeight }: ChatInputProps) {
   const [text, setText] = useState("");
   const [images, setImages] = useState<{ url: string; file: File }[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -55,13 +57,9 @@ export function ChatInput({ onSubmit, isLoading, modelId }: ChatInputProps) {
   // フォーカス時にスクロール位置を調整
   const handleFocus = () => {
     setIsFocused(true);
-    // モバイルでキーボードが表示された時に、少し遅延させてスクロール
-    setTimeout(() => {
-      if (textareaRef.current) {
-        // 入力エリアが見えるようにスクロール
-        textareaRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }, 300);
+    // モバイルでキーボードが表示された時のスクロール処理は
+    // ChatContainerコンポーネントのvisualViewport処理に任せる
+    // スクロール処理を削除
   };
 
   const handleBlur = () => {
@@ -119,19 +117,87 @@ export function ChatInput({ onSubmit, isLoading, modelId }: ChatInputProps) {
       // 画像ファイルのみを許可
       if (!file.type.startsWith('image/')) continue;
       
-      // FileReaderを使用してBase64形式に変換
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64Url = e.target?.result as string;
-        setImages(prev => [...prev, { url: base64Url, file }]);
-      };
-      reader.readAsDataURL(file);
+      // 画像を圧縮して処理
+      compressImage(file).then(compressedFile => {
+        // FileReaderを使用してBase64形式に変換
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const base64Url = e.target?.result as string;
+          setImages(prev => [...prev, { url: base64Url, file: compressedFile }]);
+        };
+        reader.readAsDataURL(compressedFile);
+      });
     }
     
     // ファイル選択をリセット
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+  };
+
+  // 画像を圧縮する関数
+  const compressImage = (file: File): Promise<File> => {
+    return new Promise((resolve) => {
+      // 5MBを超える場合のみ圧縮
+      if (file.size <= 5 * 1024 * 1024) {
+        resolve(file);
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        
+        img.onload = () => {
+          // 元のアスペクト比を維持
+          let width = img.width;
+          let height = img.height;
+          
+          // 大きすぎる画像はリサイズ
+          const MAX_WIDTH = 1600;
+          const MAX_HEIGHT = 1600;
+          
+          if (width > MAX_WIDTH) {
+            height = Math.round(height * (MAX_WIDTH / width));
+            width = MAX_WIDTH;
+          }
+          
+          if (height > MAX_HEIGHT) {
+            width = Math.round(width * (MAX_HEIGHT / height));
+            height = MAX_HEIGHT;
+          }
+          
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          
+          // 品質を調整して圧縮（0.7は70%の品質）
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                // 新しいFileオブジェクトを作成
+                const compressedFile = new File(
+                  [blob],
+                  file.name,
+                  { type: 'image/jpeg', lastModified: Date.now() }
+                );
+                resolve(compressedFile);
+              } else {
+                // 圧縮に失敗した場合は元のファイルを使用
+                resolve(file);
+              }
+            },
+            'image/jpeg',
+            0.7
+          );
+        };
+      };
+    });
   };
 
   const removeImage = (index: number) => {
@@ -143,7 +209,9 @@ export function ChatInput({ onSubmit, isLoading, modelId }: ChatInputProps) {
   };
 
   return (
-    <div className={`border-t bg-background p-2 sm:p-4 ${isFocused ? 'pb-4 sm:pb-6' : ''}`}>
+    <div className={`border-t bg-background p-2 sm:p-4 ${isFocused ? 'pb-4 sm:pb-6' : ''}`}
+      style={isKeyboardVisible ? { position: 'relative', zIndex: 20 } : undefined}
+    >
       {/* 画像プレビュー */}
       {images.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-3">
@@ -178,7 +246,10 @@ export function ChatInput({ onSubmit, isLoading, modelId }: ChatInputProps) {
             onBlur={handleBlur}
             placeholder="メッセージを入力..."
             className="resize-none w-full rounded-md border border-input bg-background px-3 py-2.5 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[44px] max-h-[200px]"
-            style={{ height: '44px' }}
+            style={{ 
+              height: '44px',
+              ...(isKeyboardVisible && viewportHeight ? { maxHeight: `${viewportHeight * 0.2}px` } : {})
+            }}
           />
         </div>
         
