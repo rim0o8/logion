@@ -1,18 +1,23 @@
 import { Button } from "@/components/ui/button";
-import { MessageContent, MessageContentItem } from "@/lib/llm/types";
+import { supportsImageInput } from "@/config/model-capabilities";
+import type { MessageContent, MessageContentItem } from "@/lib/llm/types";
 import { ImageIcon, Loader2, SendIcon, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 interface ChatInputProps {
   onSubmit: (content: MessageContent) => void;
   isLoading?: boolean;
+  modelId: string;
 }
 
-export function ChatInput({ onSubmit, isLoading }: ChatInputProps) {
+export function ChatInput({ onSubmit, isLoading, modelId }: ChatInputProps) {
   const [text, setText] = useState("");
   const [images, setImages] = useState<{ url: string; file: File }[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // モデルが画像入力をサポートしているかを確認
+  const imageInputSupported = supportsImageInput(modelId);
 
   // テキストエリアの高さを自動調整する関数
   const autoResizeTextarea = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -44,30 +49,31 @@ export function ChatInput({ onSubmit, isLoading }: ChatInputProps) {
     // テキストのみの場合は文字列として送信
     if (text.trim() && images.length === 0) {
       onSubmit(text);
-    } else {
-      // マルチモーダルコンテンツの場合は配列として送信
-      const contentItems: MessageContentItem[] = [];
-      
-      if (text.trim()) {
-        contentItems.push({
-          type: 'text',
-          text: text.trim()
-        });
-      }
-      
-      // 画像を追加
-      images.forEach(image => {
-        contentItems.push({
-          type: 'image_url',
-          image_url: {
-            url: image.url
-          }
-        });
-      });
-      
-      onSubmit(contentItems);
+      setText("");
+      return;
     }
     
+    // マルチモーダルコンテンツの場合は配列として送信
+    const contentItems: MessageContentItem[] = [];
+    
+    if (text.trim()) {
+      contentItems.push({
+        type: 'text',
+        text: text.trim()
+      });
+    }
+    
+    // 画像を追加
+    for (const image of images) {
+      contentItems.push({
+        type: 'image_url',
+        image_url: {
+          url: image.url
+        }
+      });
+    }
+    
+    onSubmit(contentItems);
     setText("");
     setImages([]);
   };
@@ -84,45 +90,49 @@ export function ChatInput({ onSubmit, isLoading }: ChatInputProps) {
     if (!files || files.length === 0) return;
     
     // 選択された各ファイルを処理
-    Array.from(files).forEach(file => {
+    for (const file of Array.from(files)) {
       // 画像ファイルのみを許可
-      if (!file.type.startsWith('image/')) return;
+      if (!file.type.startsWith('image/')) continue;
       
-      // データURLを作成
+      // FileReaderを使用してBase64形式に変換
       const reader = new FileReader();
       reader.onload = (e) => {
-        const url = e.target?.result as string;
-        setImages(prev => [...prev, { url, file }]);
+        const base64Url = e.target?.result as string;
+        setImages(prev => [...prev, { url: base64Url, file }]);
       };
       reader.readAsDataURL(file);
-    });
+    }
     
-    // ファイル入力をリセット
+    // ファイル選択をリセット
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
   const removeImage = (index: number) => {
-    setImages(prev => prev.filter((_, i) => i !== index));
+    setImages(prev => {
+      const newImages = [...prev];
+      newImages.splice(index, 1);
+      return newImages;
+    });
   };
 
   return (
-    <div className="relative">
+    <div className="border-t bg-background p-4">
       {/* 画像プレビュー */}
       {images.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-2">
-          {images.map((image, index) => (
-            <div key={index} className="relative">
+          {images.map((image, i) => (
+            <div key={`image-${i}-${image.file.name}`} className="relative">
               <img 
                 src={image.url} 
                 alt="アップロード画像" 
-                className="h-20 w-20 object-cover rounded-md border border-input"
+                className="h-20 w-20 object-cover rounded border"
               />
               <button
-                onClick={() => removeImage(index)}
-                className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1"
                 type="button"
+                onClick={() => removeImage(i)}
+                className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -131,44 +141,45 @@ export function ChatInput({ onSubmit, isLoading }: ChatInputProps) {
         </div>
       )}
       
-      <div className="flex">
-        <textarea
-          ref={textareaRef}
-          value={text}
-          onChange={autoResizeTextarea}
-          placeholder="メッセージを入力..."
-          className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-          rows={1}
-          style={{ minHeight: '40px', maxHeight: '200px' }}
-          onKeyDown={handleKeyDown}
-        />
+      <div className="flex items-end gap-2">
+        <div className="relative flex-1">
+          <textarea
+            ref={textareaRef}
+            value={text}
+            onChange={autoResizeTextarea}
+            onKeyDown={handleKeyDown}
+            placeholder="メッセージを入力..."
+            className="resize-none w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[40px] max-h-[200px]"
+            style={{ height: '40px' }}
+          />
+        </div>
         
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleImageUpload}
-          accept="image/*"
-          multiple
-          className="hidden"
-        />
+        {/* 画像アップロードボタン - モデルがサポートしている場合のみ表示 */}
+        {imageInputSupported && (
+          <Button
+            type="button"
+            size="icon"
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isLoading}
+          >
+            <ImageIcon className="h-5 w-5" />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleImageUpload}
+              className="hidden"
+            />
+          </Button>
+        )}
         
-        <Button
-          onClick={() => fileInputRef.current?.click()}
-          size="icon"
-          className="ml-2 h-10 w-10 rounded-lg"
-          variant="outline"
-          type="button"
-        >
-          <ImageIcon className="h-5 w-5" />
-        </Button>
-        
-        <Button
+        <Button 
+          type="button" 
+          size="icon" 
           onClick={handleSubmit}
           disabled={(!text.trim() && images.length === 0) || isLoading}
-          size="icon"
-          className="ml-2 h-10 w-10 rounded-lg"
-          variant="default"
-          type="button"
         >
           {isLoading ? (
             <Loader2 className="h-5 w-5 animate-spin" />

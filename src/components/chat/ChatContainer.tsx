@@ -60,14 +60,19 @@ export function ChatContainer({
   const getMessageKey = (message: Message, index: number) => {
     if (typeof message.content === 'string') {
       return `${message.content.slice(0, 10)}-${index}`;
-    } else if (Array.isArray(message.content) && message.content.length > 0) {
+    }
+    
+    if (Array.isArray(message.content) && message.content.length > 0) {
       const firstItem = message.content[0];
       if (firstItem.type === 'text' && firstItem.text) {
         return `${firstItem.text.slice(0, 10)}-${index}`;
-      } else if (firstItem.type === 'image_url') {
+      }
+      
+      if (firstItem.type === 'image_url') {
         return `image-${index}`;
       }
     }
+    
     return `message-${index}`;
   };
 
@@ -144,7 +149,11 @@ export function ChatContainer({
               />
             )}
           </div>
-          <ChatInput onSubmit={handleSendMessage} isLoading={isLoading} />
+          <ChatInput 
+            onSubmit={handleSendMessage} 
+            isLoading={isLoading} 
+            modelId={selectedModel} 
+          />
           <div className="mt-2 text-xs text-center text-muted-foreground">
             AIアシスタントは間違った情報を提供する可能性があります。重要な決断には必ず情報を検証してください。
           </div>
