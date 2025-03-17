@@ -2,7 +2,7 @@
 
 import { usePathname, useSearchParams } from 'next/navigation';
 import Script from 'next/script';
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 
 // Google Analyticsの測定ID
 const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
@@ -16,8 +16,8 @@ export const pageview = (url: string) => {
   }
 };
 
-// Google Analyticsコンポーネント
-export default function GoogleAnalytics() {
+// 実際のアナリティクスコンポーネント
+function AnalyticsComponent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -53,6 +53,15 @@ export default function GoogleAnalytics() {
         }}
       />
     </>
+  );
+}
+
+// Google Analyticsコンポーネント（サスペンスでラップ）
+export default function GoogleAnalytics() {
+  return (
+    <Suspense fallback={null}>
+      <AnalyticsComponent />
+    </Suspense>
   );
 }
 

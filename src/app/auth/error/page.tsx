@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
-export default function ErrorPage() {
+// 実際のエラーコンポーネント
+function ErrorComponent() {
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
 
@@ -61,5 +63,14 @@ export default function ErrorPage() {
         </CardFooter>
       </Card>
     </div>
+  );
+}
+
+// サスペンスでラップしたエクスポート用コンポーネント
+export default function ErrorPage() {
+  return (
+    <Suspense fallback={<div className="container flex items-center justify-center min-h-screen">読み込み中...</div>}>
+      <ErrorComponent />
+    </Suspense>
   );
 } 

@@ -8,9 +8,10 @@ import { Label } from "@/components/ui/label";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 
-export default function SignInPage() {
+// 実際のサインインコンポーネント
+function SignInComponent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -136,5 +137,14 @@ export default function SignInPage() {
         </CardFooter>
       </Card>
     </div>
+  );
+}
+
+// サスペンスでラップしたエクスポート用コンポーネント
+export default function SignInPage() {
+  return (
+    <Suspense fallback={<div className="container flex items-center justify-center min-h-screen">読み込み中...</div>}>
+      <SignInComponent />
+    </Suspense>
   );
 } 

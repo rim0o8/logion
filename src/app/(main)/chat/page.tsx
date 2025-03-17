@@ -11,6 +11,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+// 実際のチャットコンポーネント
 export default function NewChatPage() {
   const router = useRouter();
   const { data: session } = useSession();
@@ -149,7 +150,7 @@ export default function NewChatPage() {
         selectedModel={selectedModel}
         onSelectModel={setSelectedModel}
       />
-      
+
       {/* インタースティシャル広告 */}
       {isVisible && isDummyAd && (
         <DummyInterstitialAd 
@@ -159,4 +160,4 @@ export default function NewChatPage() {
       )}
     </main>
   );
-} 
+}

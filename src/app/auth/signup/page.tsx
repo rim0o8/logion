@@ -8,9 +8,10 @@ import { Label } from "@/components/ui/label";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 
-export default function SignUpPage() {
+// 実際のサインアップコンポーネント
+function SignUpComponent() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
@@ -20,7 +21,6 @@ export default function SignUpPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const callbackUrl = searchParams.get("callbackUrl") || "/subscription";
-
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -185,5 +185,14 @@ export default function SignUpPage() {
                 </CardFooter>
             </Card>
         </div>
+    );
+}
+
+// サスペンスでラップしたエクスポート用コンポーネント
+export default function SignUpPage() {
+    return (
+        <Suspense fallback={<div className="container flex items-center justify-center min-h-screen">読み込み中...</div>}>
+            <SignUpComponent />
+        </Suspense>
     );
 } 

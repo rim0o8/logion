@@ -5,8 +5,10 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type React from "react";
+import { Suspense } from "react";
 
-const WelcomePage: React.FC = () => {
+// 実際のウェルカムコンポーネント
+const WelcomeComponent: React.FC = () => {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
 
@@ -42,6 +44,15 @@ const WelcomePage: React.FC = () => {
         </CardFooter>
       </Card>
     </div>
+  );
+};
+
+// サスペンスでラップしたエクスポート用コンポーネント
+const WelcomePage: React.FC = () => {
+  return (
+    <Suspense fallback={<div className="container flex items-center justify-center min-h-screen">読み込み中...</div>}>
+      <WelcomeComponent />
+    </Suspense>
   );
 };
 
