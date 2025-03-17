@@ -13,8 +13,8 @@ export async function POST(request: Request) {
     const messages: Message[] = body.messages;
     const stream = body.stream === true;
     const model = body.model || DEFAULT_CONFIG.model;
-    const userId = body.userId;
-    const userEmail = body.userEmail;
+    const userId = body.userId || 'anonymous';
+    const userEmail = body.userEmail || 'anonymous';
     const conversationId = body.conversationId;
 
     console.log(userId, userEmail, conversationId);
