@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Loader2, SendIcon } from "lucide-react";
 import { useState } from "react";
 
@@ -24,15 +23,36 @@ export function ChatInput({ onSubmit, isLoading }: ChatInputProps) {
     }
   };
 
+  // テキストエリアの高さを自動調整する関数
+  const autoResizeTextarea = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const textarea = e.target;
+    
+    // 高さをリセットして実際のコンテンツの高さを取得
+    textarea.style.height = 'auto';
+    
+    // スクロール高さに基づいて高さを設定（最小高さと最大高さの制限付き）
+    const newHeight = Math.min(Math.max(textarea.scrollHeight, 40), 200);
+    textarea.style.height = `${newHeight}px`;
+    
+    // テキスト内容を更新
+    setContent(textarea.value);
+  };
+
   return (
     <div className="relative">
-      <Textarea
+      <textarea
         value={content}
-        onChange={(e) => setContent(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder="メッセージを送信..."
-        className="min-h-[56px] max-h-[200px] resize-none pr-12 rounded-xl border-input bg-background focus:border-ring focus:ring-ring shadow-sm dark:shadow-none"
-        disabled={isLoading}
+        onChange={autoResizeTextarea}
+        placeholder="メッセージを入力..."
+        className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        rows={1}
+        style={{ minHeight: '40px', maxHeight: '200px' }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSubmit();
+          }
+        }}
       />
       <Button
         onClick={handleSubmit}
