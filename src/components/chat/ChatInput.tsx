@@ -209,23 +209,28 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
   };
 
   return (
-    <div className={`border-t bg-background p-2 sm:p-4 ${isFocused ? 'pb-4 sm:pb-6' : ''}`}
-      style={isKeyboardVisible ? { position: 'relative', zIndex: 20 } : undefined}
+    <div 
+      className={`border-t bg-background p-2 sm:p-4 ${isFocused ? 'pb-4 sm:pb-6' : ''}`}
+      style={isKeyboardVisible ? { 
+        position: 'relative', 
+        zIndex: 20,
+        paddingBottom: isKeyboardVisible ? '8px' : undefined 
+      } : undefined}
     >
       {/* 画像プレビュー */}
       {images.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-3">
+        <div className="flex flex-wrap gap-2 mb-3 overflow-x-auto pb-1">
           {images.map((image, i) => (
             <div key={`image-${i}-${image.file.name}`} className="relative">
               <img 
                 src={image.url} 
                 alt="アップロード画像" 
-                className="h-16 w-16 sm:h-20 sm:w-20 object-cover rounded border"
+                className="h-16 w-16 sm:h-20 sm:w-20 object-cover rounded-md border shadow-sm"
               />
               <button
                 type="button"
                 onClick={() => removeImage(i)}
-                className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1.5 touch-manipulation"
+                className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1.5 touch-manipulation shadow-sm active:scale-95 transition-transform"
                 aria-label="画像を削除"
               >
                 <X className="h-3 w-3" />
@@ -255,25 +260,28 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
         
         {/* 画像アップロードボタン - モデルがサポートしている場合のみ表示 */}
         {imageInputSupported && (
-          <Button
-            type="button"
-            size="icon"
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isLoading}
-            className="h-10 w-10 touch-manipulation"
-            aria-label="画像をアップロード"
-          >
-            <ImageIcon className="h-5 w-5" />
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handleImageUpload}
-              className="hidden"
-            />
-          </Button>
+          <div className="relative">
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isLoading}
+              className="h-10 w-10 touch-manipulation active:scale-95 transition-transform"
+              aria-label="画像をアップロード"
+            >
+              <ImageIcon className="h-5 w-5" />
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleImageUpload}
+                className="absolute opacity-0 inset-0 w-full h-full cursor-pointer"
+                style={{ zIndex: 1 }}
+              />
+            </Button>
+          </div>
         )}
         
         <Button 
@@ -281,7 +289,7 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
           size="icon" 
           onClick={handleSubmit}
           disabled={(!text.trim() && images.length === 0) || isLoading}
-          className="h-10 w-10 touch-manipulation"
+          className="h-10 w-10 touch-manipulation active:scale-95 transition-transform"
           aria-label="メッセージを送信"
         >
           {isLoading ? (

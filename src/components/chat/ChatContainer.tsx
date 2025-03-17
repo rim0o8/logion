@@ -121,6 +121,7 @@ export function ChatContainer({
     paddingBottom: `calc(${viewportHeight * 0.4}px)`,
     height: `${viewportHeight}px`,
     maxHeight: `${viewportHeight}px`,
+    transition: 'padding-bottom 0.2s ease-out'
   } : {};
 
   return (
@@ -187,12 +188,16 @@ export function ChatContainer({
       </div>
 
       {/* 入力エリア */}
-      <div className={`fixed bottom-0 left-0 right-0 bg-background border-t z-10 dark:border-border ${isKeyboardVisible ? 'keyboard-visible' : ''}`}
+      <div 
+        className={`fixed bottom-0 left-0 right-0 bg-background border-t z-10 dark:border-border ${isKeyboardVisible ? 'keyboard-visible' : ''}`}
         style={{ 
           position: 'fixed',
           bottom: 0,
           width: '100%',
-          zIndex: 10
+          zIndex: 10,
+          transition: 'transform 0.2s ease-out',
+          transform: isKeyboardVisible ? 'translateY(0)' : 'translateY(0)',
+          boxShadow: '0 -2px 10px rgba(0,0,0,0.05)'
         }}
       >
         <div className="max-w-3xl mx-auto px-2 sm:px-4 pb-safe">

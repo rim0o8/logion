@@ -47,14 +47,24 @@ export function ChatMessage({ message, isLoading }: ChatMessageProps) {
           
           if (item.type === 'image_url' && item.image_url) {
             return (
-              <div key={uniqueKey} className="max-w-full overflow-hidden">
+              <button 
+                key={uniqueKey} 
+                type="button"
+                className="max-w-full overflow-hidden bg-transparent border-0 p-0 cursor-zoom-in"
+                onClick={(e) => {
+                  const imgContainer = e.currentTarget;
+                  const img = imgContainer.querySelector('img');
+                  if (img) toggleImageExpand(img as HTMLImageElement);
+                }}
+                aria-label="画像を拡大/縮小"
+              >
                 <img 
                   src={item.image_url.url} 
                   alt="画像" 
-                  className="max-w-full max-h-[200px] sm:max-h-[300px] object-contain rounded-md"
+                  className="max-w-full max-h-[200px] sm:max-h-[300px] object-contain rounded-md shadow-sm hover:shadow-md transition-shadow"
                   loading="lazy"
                 />
-              </div>
+              </button>
             );
           }
           
@@ -64,20 +74,35 @@ export function ChatMessage({ message, isLoading }: ChatMessageProps) {
     );
   };
 
+  // 画像の拡大/縮小を切り替える関数
+  const toggleImageExpand = (img: HTMLImageElement) => {
+    if (img.classList.contains('expanded')) {
+      img.classList.remove('expanded');
+      img.style.maxHeight = '';
+      img.style.objectFit = '';
+      img.style.cursor = '';
+    } else {
+      img.classList.add('expanded');
+      img.style.maxHeight = '80vh';
+      img.style.objectFit = 'contain';
+      img.style.cursor = 'zoom-out';
+    }
+  };
+
   return (
     <div className={cn(
-      "flex items-start gap-2 sm:gap-4 py-3 sm:py-4 group",
+      "flex items-start gap-2 sm:gap-4 py-2 sm:py-4 group",
       isUser ? "justify-end" : "justify-start"
     )}>
-      {/* デスクトップ版のみアイコンを表示 */}
+      {/* モバイルでも小さいアイコンを表示 */}
       {!isUser && (
-        <div className="hidden sm:flex h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-primary items-center justify-center shrink-0">
-          <Bot className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
+        <div className="flex h-6 w-6 sm:h-8 sm:w-8 rounded-full bg-primary items-center justify-center shrink-0">
+          <Bot className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-primary-foreground" />
         </div>
       )}
 
       <div className={cn(
-        "rounded-xl sm:rounded-2xl px-3 py-2 sm:px-4 sm:py-3 max-w-[90%] sm:max-w-[80%] break-words",
+        "rounded-xl sm:rounded-2xl px-3 py-2 sm:px-4 sm:py-3 max-w-[85%] sm:max-w-[80%] break-words",
         isUser 
           ? "bg-primary text-primary-foreground" 
           : "bg-card text-card-foreground border shadow-sm dark:border-border dark:shadow-none"
@@ -93,10 +118,10 @@ export function ChatMessage({ message, isLoading }: ChatMessageProps) {
         )}
       </div>
 
-      {/* デスクトップ版のみアイコンを表示 */}
+      {/* モバイルでも小さいアイコンを表示 */}
       {isUser && (
-        <div className="hidden sm:flex h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-muted items-center justify-center shrink-0">
-          <User className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+        <div className="flex h-6 w-6 sm:h-8 sm:w-8 rounded-full bg-muted items-center justify-center shrink-0">
+          <User className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-muted-foreground" />
         </div>
       )}
     </div>
