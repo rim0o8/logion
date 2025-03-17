@@ -61,10 +61,13 @@ export function ConversationList({ closeMenu }: ConversationListProps) {
     e.preventDefault();
     e.stopPropagation();
 
-    if (confirm('この会話を削除してもよろしいですか？')) {
-      deleteConversation(id);
-      // ローカルステートを直接更新して再レンダリングを最適化
-      setConversations(prev => prev.filter(c => c.id !== id));
+    deleteConversation(id);
+    // ローカルステートを直接更新して再レンダリングを最適化
+    setConversations(prev => prev.filter(c => c.id !== id));
+    
+    // 現在のページが削除された会話のページである場合、新しいチャットページにリダイレクト
+    if (pathname === `/chat/${id}`) {
+      router.push('/chat');
     }
   };
 
@@ -156,7 +159,7 @@ export function ConversationList({ closeMenu }: ConversationListProps) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 rounded-full opacity-0 group-hover:opacity-100"
+                    className="h-6 w-6 rounded-full"
                     onClick={(e) => handleDeleteConversation(conversation.id, e)}
                   >
                     <Trash2 className="h-3 w-3" />

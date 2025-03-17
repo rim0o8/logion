@@ -1,15 +1,12 @@
 'use client';
 
-import { DummyInterstitialAd } from "@/components/ads/DummyInterstitialAd";
-import { ChatContainer } from "@/components/chat/ChatContainer";
 import { DEFAULT_MODEL } from "@/config/llm";
 import { useInterstitialAd } from '@/lib/ads/webAdManager';
-import type { Message, MessageContent } from "@/lib/llm/types";
-import type { Conversation } from "@/lib/storage";
-import { generateConversationId, generateTitle, saveConversation } from "@/lib/storage";
+import type { Message } from "@/lib/llm/types";
+import { generateConversationId } from "@/lib/storage";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 // 実際のチャットコンポーネント
 export default function NewChatPage() {
@@ -21,145 +18,21 @@ export default function NewChatPage() {
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL);
   const { loaded, showInterstitial, isVisible, closeInterstitial, isDummyAd, modelId } = useInterstitialAd(selectedModel);
 
-  const handleSendMessage = async (content: MessageContent, model?: string) => {
-    try {
-      setIsLoading(true);
+  // 初回レンダリング時に新しい会話IDを生成してリダイレクト
+  useEffect(() => {
+    // 新しい会話IDを生成
+    const newConversationId = generateConversationId();
+    
+    // 新しい会話ページにリダイレクト（保存せずに直接リダイレクト）
+    router.push(`/chat/${newConversationId}`);
+  }, [router]);
 
-      // ユーザーメッセージを追加
-      const userMessage: Message = {
-        role: 'user',
-        content,
-      };
-      
-      const updatedMessages = [...messages, userMessage];
-      setMessages(updatedMessages);
-
-      // 初期の空のアシスタントメッセージを追加（ストリーミング用）
-      setStreamingContent("");
-      
-      // 新しい会話IDを生成
-      const conversationId = generateConversationId();
-      
-      // APIリクエスト（ストリーミングモード）
-      const response = await fetch('/api/conversation', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: updatedMessages,
-          stream: true,
-          model: model || selectedModel, // モデルを指定
-          conversationId: conversationId, // 会話IDを追加
-          userId: session?.user?.email || session?.email,
-          userEmail: session?.user?.email || session?.email,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('APIエラーが発生しました');
-      }
-
-      if (!response.body) {
-        throw new Error('レスポンスボディがありません');
-      }
-
-      // ストリームの読み取り
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let finalContent: MessageContent = '';
-      let assistantMessage: Message | undefined = undefined;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        // デコードしてJSONを解析
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n').filter(line => line.trim() !== '');
-
-        for (const line of lines) {
-          try {
-            const data = JSON.parse(line);
-
-            if (data.type === 'chunk') {
-              // ストリーミングコンテンツを更新
-              setStreamingContent(data.content);
-              finalContent = data.content;
-            } else if (data.type === 'done') {
-              // 完了したメッセージを追加
-              assistantMessage = data.message;
-              if (assistantMessage) {
-                finalContent = assistantMessage.content;
-                setMessages(prev => [...prev, assistantMessage as Message]);
-              }
-              setStreamingContent(null);
-            }
-          } catch (e) {
-            console.error('JSONの解析に失敗しました:', line, e);
-          }
-        }
-      }
-
-      // 初回メッセージの場合、新しい会話を作成して保存
-      if (messages.length === 0 && assistantMessage) {
-        const newConversationId = generateConversationId();
-        const title = generateTitle(updatedMessages);
-        
-        const newConversation: Conversation = {
-          id: newConversationId,
-          title,
-          messages: [...updatedMessages, assistantMessage],
-          model: model || selectedModel, // モデル情報を保存
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
-        
-        saveConversation(newConversation);
-        
-        // 新しい会話ページにリダイレクト
-        router.push(`/chat/${newConversationId}`);
-      }
-
-      // 会話が完了したらインタースティシャル広告を表示する可能性
-      if (loaded) {
-        showInterstitial();
-      }
-
-    } catch (error) {
-      console.error('エラー:', error);
-      alert('メッセージの送信に失敗しました');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // 表示用のメッセージ配列を作成（通常のメッセージ + ストリーミング中のメッセージ）
-  const displayMessages = [...messages];
-  if (streamingContent !== null) {
-    displayMessages.push({
-      role: 'assistant',
-      content: streamingContent
-    });
-  }
-
+  // このページでは実際のチャット機能は使用せず、リダイレクトのみを行う
   return (
     <main className="flex-1 flex flex-col h-full bg-background">
-      <ChatContainer
-        messages={displayMessages}
-        onSendMessage={handleSendMessage}
-        isLoading={isLoading}
-        selectedModel={selectedModel}
-        onSelectModel={setSelectedModel}
-      />
-
-      {/* インタースティシャル広告 */}
-      {isVisible && isDummyAd && (
-        <DummyInterstitialAd 
-          onClose={closeInterstitial}
-          modelId={modelId}
-        />
-      )}
+      <div className="flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary" />
+      </div>
     </main>
   );
 }

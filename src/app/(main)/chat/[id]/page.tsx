@@ -6,7 +6,7 @@ import { DEFAULT_MODEL } from "@/config/llm";
 import { useInterstitialAd } from '@/lib/ads/webAdManager';
 import type { Message, MessageContent } from "@/lib/llm/types";
 import type { Conversation } from "@/lib/storage";
-import { getConversation, saveConversation } from "@/lib/storage";
+import { generateTitle, getConversation, saveConversation } from "@/lib/storage";
 import { useSession } from "next-auth/react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -23,6 +23,7 @@ export default function ChatPage() {
   const [streamingContent, setStreamingContent] = useState<string | null>(null);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL);
+  const [isConversationSaved, setIsConversationSaved] = useState(false);
   const { loaded, showInterstitial, isVisible, closeInterstitial, isDummyAd, modelId } = useInterstitialAd(selectedModel);
 
   // 会話データを読み込み
@@ -32,32 +33,54 @@ export default function ChatPage() {
       if (conv) {
         setConversation(conv);
         setMessages(conv.messages);
+        setIsConversationSaved(true);
         // 保存されているモデルがあれば、それを使用
         if (conv.model) {
           setSelectedModel(conv.model);
         }
-      } else {
-        // 会話が見つからない場合は新しいチャットページにリダイレクト
-        router.push('/chat');
       }
+      // 会話が見つからない場合は新規作成（保存はしない）
       setIsInitialLoading(false);
     };
 
     loadConversation();
-  }, [conversationId, router]);
+  }, [conversationId]);
 
-  // メッセージが更新されたら会話を保存
+  // メッセージが更新されたら会話を保存（AIからの応答がある場合のみ）
   useEffect(() => {
-    if (conversation && messages.length > 0) {
+    // メッセージがない場合は保存しない
+    if (messages.length === 0) return;
+    
+    // AIからの応答がある場合のみ保存
+    const hasAssistantMessage = messages.some(msg => msg.role === 'assistant');
+    if (!hasAssistantMessage) return;
+    
+    // 会話を保存
+    if (conversation) {
+      // 既存の会話を更新
       const updatedConversation: Conversation = {
         ...conversation,
         messages,
-        model: selectedModel, // モデル情報を保存
+        model: selectedModel,
         updatedAt: new Date().toISOString()
       };
       saveConversation(updatedConversation);
+    } else {
+      // 新しい会話を作成
+      const title = generateTitle(messages);
+      const newConversation: Conversation = {
+        id: conversationId,
+        title,
+        messages,
+        model: selectedModel,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      saveConversation(newConversation);
+      setConversation(newConversation);
+      setIsConversationSaved(true);
     }
-  }, [messages, conversation, selectedModel]);
+  }, [messages, conversation, selectedModel, conversationId]);
 
   const handleSendMessage = async (content: MessageContent, model?: string) => {
     try {
