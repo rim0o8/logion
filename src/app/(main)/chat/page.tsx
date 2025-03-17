@@ -4,7 +4,7 @@ import { DummyInterstitialAd } from "@/components/ads/DummyInterstitialAd";
 import { ChatContainer } from "@/components/chat/ChatContainer";
 import { DEFAULT_MODEL } from "@/config/llm";
 import { useInterstitialAd } from '@/lib/ads/webAdManager';
-import type { Message } from "@/lib/llm/types";
+import type { Message, MessageContent } from "@/lib/llm/types";
 import type { Conversation } from "@/lib/storage";
 import { generateConversationId, generateTitle, saveConversation } from "@/lib/storage";
 import { useSession } from "next-auth/react";
@@ -21,7 +21,7 @@ export default function NewChatPage() {
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL);
   const { loaded, showInterstitial, isVisible, closeInterstitial, isDummyAd, modelId } = useInterstitialAd(selectedModel);
 
-  const handleSendMessage = async (content: string, model?: string) => {
+  const handleSendMessage = async (content: MessageContent, model?: string) => {
     try {
       setIsLoading(true);
 

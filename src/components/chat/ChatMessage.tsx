@@ -1,4 +1,4 @@
-import type { Message } from "@/lib/llm/types";
+import { Message, MessageContentItem } from "@/lib/llm/types";
 import { cn } from "@/lib/utils";
 import { Bot, User } from "lucide-react";
 import { Markdown } from "../ui/Markdown";
@@ -10,6 +10,49 @@ interface ChatMessageProps {
 
 export function ChatMessage({ message, isLoading }: ChatMessageProps) {
   const isUser = message.role === 'user';
+
+  // メッセージコンテンツを表示する関数
+  const renderContent = () => {
+    const { content } = message;
+    
+    // 文字列の場合（従来の形式）
+    if (typeof content === 'string') {
+      return isUser ? (
+        <p className="whitespace-pre-wrap">{content}</p>
+      ) : (
+        <Markdown content={content} />
+      );
+    }
+    
+    // 配列の場合（マルチモーダル）
+    return (
+      <div className="flex flex-col gap-2">
+        {content.map((item: MessageContentItem, index: number) => {
+          if (item.type === 'text' && item.text) {
+            return isUser ? (
+              <p key={`text-${index}`} className="whitespace-pre-wrap">{item.text}</p>
+            ) : (
+              <Markdown key={`text-${index}`} content={item.text} />
+            );
+          }
+          
+          if (item.type === 'image_url' && item.image_url) {
+            return (
+              <div key={`image-${index}`} className="max-w-full overflow-hidden">
+                <img 
+                  src={item.image_url.url} 
+                  alt="画像" 
+                  className="max-w-full max-h-[300px] object-contain rounded-md"
+                />
+              </div>
+            );
+          }
+          
+          return null;
+        })}
+      </div>
+    );
+  };
 
   return (
     <div className={cn(
@@ -28,20 +71,14 @@ export function ChatMessage({ message, isLoading }: ChatMessageProps) {
           ? "bg-primary text-primary-foreground" 
           : "bg-card text-card-foreground border shadow-sm dark:border-border dark:shadow-none"
       )}>
-        {isUser ? (
-          <p className="whitespace-pre-wrap">{message.content}</p>
-        ) : (
-          <>
-            <Markdown content={message.content} />
+        {renderContent()}
 
-            {isLoading && message.content.length === 0 && (
-              <div className="flex items-center space-x-2 mt-2">
-                <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '200ms' }} />
-                <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '400ms' }} />
-              </div>
-            )}
-          </>
+        {isLoading && (typeof message.content === 'string' ? message.content.length === 0 : false) && (
+          <div className="flex items-center space-x-2 mt-2">
+            <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
+            <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '200ms' }} />
+            <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '400ms' }} />
+          </div>
         )}
       </div>
 

@@ -1,6 +1,6 @@
 import { DEFAULT_MODEL } from '@/config/llm';
 import { useBannerAd } from '@/lib/ads/webAdManager';
-import type { Message } from "@/lib/llm/types";
+import type { Message, MessageContent } from "@/lib/llm/types";
 import { useEffect, useRef } from "react";
 import { DummyBannerAd } from "../ads/DummyBannerAd";
 import { WebBannerAd } from "../ads/WebBannerAd";
@@ -10,7 +10,7 @@ import { ModelSelector } from "./ModelSelector";
 
 interface ChatContainerProps {
   messages: Message[];
-  onSendMessage: (content: string, model?: string) => void;
+  onSendMessage: (content: MessageContent, model?: string) => void;
   isLoading?: boolean;
   selectedModel?: string;
   onSelectModel?: (modelId: string) => void;
@@ -49,21 +49,26 @@ export function ChatContainer({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleSendMessage = (content: string) => {
+  const handleSendMessage = (content: MessageContent) => {
     onSendMessage(content, selectedModel);
   };
 
   // 広告表示ロジック
   const { showAd, adUnitId, isDummyAd, rotationInterval } = useBannerAd(selectedModel);
 
-  // 広告表示位置の決定
-  const shouldShowAdAfterMessage = (index: number, message: Message) => {
-    if (!showAd || messages.length === 0) return false;
-    
-    // 現在のメッセージがAIの発言で、次のメッセージがない、または次のメッセージがユーザーの発言の場合に広告を表示
-    return message.role === 'assistant' && 
-           (index === messages.length - 1 || 
-            (index + 1 < messages.length && messages[index + 1].role === 'user'));
+  // メッセージのキーを生成する関数
+  const getMessageKey = (message: Message, index: number) => {
+    if (typeof message.content === 'string') {
+      return `${message.content.slice(0, 10)}-${index}`;
+    } else if (Array.isArray(message.content) && message.content.length > 0) {
+      const firstItem = message.content[0];
+      if (firstItem.type === 'text' && firstItem.text) {
+        return `${firstItem.text.slice(0, 10)}-${index}`;
+      } else if (firstItem.type === 'image_url') {
+        return `image-${index}`;
+      }
+    }
+    return `message-${index}`;
   };
 
   return (
@@ -94,7 +99,7 @@ export function ChatContainer({
           ) : (
             <div className="px-4 space-y-2">
               {messages.map((message, index) => (
-                <div key={`${message.content.slice(0, 10)}-${index}`}>
+                <div key={getMessageKey(message, index)}>
                   <ChatMessage
                     message={message}
                     isLoading={index === messages.length - 1 && isLoading && message.role === 'assistant'}

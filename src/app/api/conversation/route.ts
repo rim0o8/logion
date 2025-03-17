@@ -24,6 +24,28 @@ export async function POST(request: Request) {
       );
     }
 
+    // メッセージの内容を検証
+    for (const message of messages) {
+      if (!message.role || !message.content) {
+        return NextResponse.json(
+          { error: 'メッセージには role と content が必要です' },
+          { status: 400 }
+        );
+      }
+      
+      // 画像URLの検証（配列形式のコンテンツの場合）
+      if (Array.isArray(message.content)) {
+        for (const item of message.content) {
+          if (item.type === 'image_url' && (!item.image_url || !item.image_url.url)) {
+            return NextResponse.json(
+              { error: '画像URLが不正です' },
+              { status: 400 }
+            );
+          }
+        }
+      }
+    }
+
     // 初期状態を設定
     const initialState: ConversationState = {
       messages,
@@ -67,7 +89,7 @@ export async function POST(request: Request) {
                   })}\n`);
                   controller.enqueue(encodedChunk);
                   
-                  lastContent = newContent;
+                  lastContent = newContent as string;
                 }
               }
             }

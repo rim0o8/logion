@@ -1,6 +1,16 @@
+export type MessageContentItem = {
+  type: 'text' | 'image_url';
+  text?: string;
+  image_url?: {
+    url: string;
+  };
+};
+
+export type MessageContent = string | MessageContentItem[];
+
 export interface Message {
   role: 'user' | 'assistant' | 'system';
-  content: string;
+  content: MessageContent;
 }
 
 export interface LLMConfig {

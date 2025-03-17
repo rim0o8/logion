@@ -9,9 +9,17 @@ import { ChatDeepSeek } from "@langchain/deepseek";
 import { ChatOpenAI } from "@langchain/openai";
 
 // 型定義
+export type MessageContent = string | Array<{
+  type: 'text' | 'image_url';
+  text?: string;
+  image_url?: {
+    url: string;
+  };
+}>;
+
 export type Message = {
   role: 'user' | 'assistant' | 'system';
-  content: string;
+  content: MessageContent;
 };
 
 export interface ConversationState {
@@ -69,13 +77,14 @@ function getLLMModel(modelName: string) {
 // メッセージをLangChainフォーマットに変換
 function convertToLangChainMessages(messages: Message[]) {
   return messages.map(msg => {
+    const content = msg.content;
     if (msg.role === 'user') {
-      return new HumanMessage(msg.content);
+      return new HumanMessage({ content });
     }
     if (msg.role === 'assistant') {
-      return new AIMessage(msg.content);
+      return new AIMessage({ content });
     }
-    return new SystemMessage(msg.content);
+    return new SystemMessage({ content });
   });
 }
 
@@ -83,7 +92,7 @@ function convertToLangChainMessages(messages: Message[]) {
 function convertFromLangChainMessage(message: AIMessage): Message {
   return {
     role: 'assistant',
-    content: message.content as string,
+    content: message.content as MessageContent,
   };
 }
 
