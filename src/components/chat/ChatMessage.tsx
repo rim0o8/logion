@@ -20,15 +20,12 @@ export function ChatMessage({ message, isLoading }: ChatMessageProps) {
   // メッセージの内容をコピーする関数
   const copyMessageToClipboard = () => {
     if (!messageContentRef.current) return;
-    
     const text = getMessageText();
-    
     // クリップボードにコピー
     navigator.clipboard.writeText(text).then(() => {
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
     });
-    
     // メニューを閉じる
     setIsMenuOpen(false);
   };
