@@ -136,7 +136,7 @@ export default function ChatPage() {
         for (const line of lines) {
           try {
             const data = JSON.parse(line);
-            
+
             if (data.type === 'chunk') {
               // ストリーミングコンテンツを更新
               setStreamingContent(data.content);

@@ -32,7 +32,7 @@ export async function POST(request: Request) {
           { status: 400 }
         );
       }
-      
+
       // 画像URLの検証（配列形式のコンテンツの場合）
       if (Array.isArray(message.content)) {
         for (const item of message.content) {

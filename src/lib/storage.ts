@@ -1,4 +1,4 @@
-import type { Message } from "./llm/types";
+import type { Message, MessageContent, MessageContentItem } from "./llm/types";
 
 export interface Conversation {
   id: string;
@@ -14,6 +14,42 @@ const CONVERSATIONS_KEY = 'chat-conversations';
 
 // キャッシュ
 let conversationsCache: Conversation[] | null = null;
+
+/**
+ * 画像データが含まれるメッセージを処理し、画像データをURLに置き換える
+ * @param message 処理するメッセージ
+ * @returns 処理済みのメッセージ（画像のbase64データをURLに置き換え済み）
+ */
+export function processMessageForStorage(message: Message): Message {
+  // コンテンツが配列の場合に処理
+  if (Array.isArray(message.content)) {
+    // 画像URLのみを保持し、base64データを除外した新しいコンテンツを作成
+    const processedContent = message.content.map((item: MessageContentItem) => {
+      if (item.type === 'image_url' && item.image_url) {
+        // 既にURLで、base64データでない場合はそのまま返す
+        if (item.image_url.url && !item.image_url.url.startsWith('data:image/')) {
+          return item;
+        }
+        
+        // base64データの場合は、サイズ削減のためにURLのみを保持するオブジェクトを返す
+        return {
+          type: 'image_url' as const,
+          image_url: {
+            url: `${item.image_url.url.substring(0, 50)}...[image data truncated]`
+          }
+        };
+      }
+      return item;
+    }) as MessageContent;
+    
+    return {
+      ...message,
+      content: processedContent
+    };
+  }
+  
+  return message;
+}
 
 // 会話リストを取得
 export function getConversations(): Conversation[] {
@@ -46,18 +82,25 @@ export function saveConversation(conversation: Conversation): void {
     conversationsCache = getConversations();
   }
   
+  // 会話内のメッセージを処理（画像データを最適化）
+  const processedMessages = conversation.messages.map(processMessageForStorage);
+  const processedConversation = {
+    ...conversation,
+    messages: processedMessages
+  };
+  
   const existingIndex = conversationsCache.findIndex(c => c.id === conversation.id);
   
   if (existingIndex >= 0) {
     // 既存の会話を更新
     conversationsCache[existingIndex] = {
-      ...conversation,
+      ...processedConversation,
       updatedAt: new Date().toISOString()
     };
   } else {
     // 新しい会話を追加
     conversationsCache.push({
-      ...conversation,
+      ...processedConversation,
       createdAt: conversation.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });

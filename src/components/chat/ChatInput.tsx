@@ -15,7 +15,8 @@ interface ChatInputProps {
 
 export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, viewportHeight }: ChatInputProps) {
   const [text, setText] = useState("");
-  const [images, setImages] = useState<{ url: string; file: File }[]>([]);
+  const [images, setImages] = useState<{ url: string }[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isFocused, setIsFocused] = useState(false);
@@ -117,60 +118,96 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
     const maxImages = 3;
     let processedCount = 0;
     
-    // 選択された各ファイルを処理
-    for (const file of Array.from(files)) {
-      // 処理画像数の制限
-      if (processedCount >= maxImages) {
-        console.warn(`最大${maxImages}枚までの画像を処理します。残りの画像はスキップされました。`);
-        break;
-      }
-      
-      // 画像ファイルのみを許可
-      if (!file.type.startsWith('image/')) continue;
-      
-      // ファイルサイズの確認（50MB以上は処理しない）
-      if (file.size > 50 * 1024 * 1024) {
-        console.error('ファイルが大きすぎます（50MB以上）。処理をスキップします。');
-        continue;
-      }
-      
-      try {
-        // 処理開始を伝えるUI表示があると良い（ここではコンソールログのみ）
-        console.log(`画像処理中: ${file.name}`);
-        
-        // 処理タイムアウト（30秒）
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('画像処理がタイムアウトしました')), 30000);
-        });
-        
-        // ユーティリティ関数を使用して画像を処理
-        const maxFileSize = 5 * 1024 * 1024; // 5MB
-        const processPromise = processImageFile(file, {
-          maxWidth: 1600,
-          maxHeight: 1600,
-          quality: 0.7,
-          format: 'image/jpeg',
-          sizeThreshold: maxFileSize, // 5MB以下は圧縮しない
-          targetSize: file.size > maxFileSize ? maxFileSize : undefined // 5MBより大きい場合のみ圧縮対象に
-        });
-        
-        // タイムアウトか処理完了のどちらか早い方
-        const { base64, file: compressedFile } = await Promise.race([
-          processPromise,
-          timeoutPromise
-        ]);
-        
-        setImages(prev => [...prev, { url: base64, file: compressedFile }]);
-        processedCount++;
-      } catch (error) {
-        console.error('画像処理エラー:', error);
-        // エラーメッセージをユーザーに表示する仕組みがあると良い
-      }
-    }
+    setIsUploading(true);
+    console.log('画像アップロード開始');
     
-    // ファイル選択をリセット
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+    try {
+      // 選択された各ファイルを処理
+      for (const file of Array.from(files)) {
+        // 処理画像数の制限
+        if (processedCount >= maxImages) {
+          console.warn(`最大${maxImages}枚までの画像を処理します。残りの画像はスキップされました。`);
+          break;
+        }
+        
+        // 画像ファイルのみを許可
+        if (!file.type.startsWith('image/')) continue;
+        
+        // ファイルサイズの確認（50MB以上は処理しない）
+        if (file.size > 50 * 1024 * 1024) {
+          console.error('ファイルが大きすぎます（50MB以上）。処理をスキップします。');
+          continue;
+        }
+        
+        try {
+          // 処理開始を伝えるUI表示があると良い（ここではコンソールログのみ）
+          console.log(`画像処理中: ${file.name}`);
+          
+          // 処理タイムアウト（30秒）
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('画像処理がタイムアウトしました')), 30000);
+          });
+          
+          // ユーティリティ関数を使用して画像を処理
+          const maxFileSize = 5 * 1024 * 1024; // 5MB
+          const processPromise = processImageFile(file, {
+            maxWidth: 1600,
+            maxHeight: 1600,
+            quality: 0.7,
+            format: 'image/jpeg',
+            sizeThreshold: maxFileSize, // 5MB以下は圧縮しない
+            targetSize: file.size > maxFileSize ? maxFileSize : undefined // 5MBより大きい場合のみ圧縮対象に
+          });
+          
+          // タイムアウトか処理完了のどちらか早い方
+          const { base64, file: compressedFile } = await Promise.race([
+            processPromise,
+            timeoutPromise
+          ]);
+          
+          console.log('画像処理完了:', compressedFile.name);
+          
+          // APIを呼び出して画像をアップロード
+          console.log('Firebase Storageにアップロード開始');
+          const response = await fetch('/api/upload', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+              imageData: base64, 
+              fileName: compressedFile.name 
+            }),
+          });
+          
+          if (!response.ok) {
+            throw new Error(`アップロード失敗: ${response.status} ${response.statusText}`);
+          }
+          
+          const data = await response.json();
+          console.log('アップロード応答:', data);
+          
+          if (data.success && data.url) {
+            // アップロードされたURLを保存
+            setImages(prev => [...prev, { url: data.url }]);
+            processedCount++;
+            console.log('画像アップロード成功:', data.url);
+          } else {
+            throw new Error('アップロードレスポンスにURLがありません');
+          }
+        } catch (error) {
+          console.error('画像処理・アップロードエラー:', error);
+          // エラーメッセージをユーザーに表示する仕組みがあると良い
+        }
+      }
+    } finally {
+      setIsUploading(false);
+      console.log('画像アップロード処理完了');
+      
+      // ファイル選択をリセット
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -195,7 +232,7 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
       {images.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-3 overflow-x-auto pb-1">
           {images.map((image, i) => (
-            <div key={`image-${i}-${image.file.name}`} className="relative">
+            <div key={`image-${i}`} className="relative">
               <img 
                 src={image.url} 
                 alt="アップロード画像" 
@@ -240,11 +277,15 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
               size="icon"
               variant="outline"
               onClick={() => fileInputRef.current?.click()}
-              disabled={isLoading}
+              disabled={isLoading || isUploading}
               className="h-10 w-10 touch-manipulation active:scale-95 transition-transform"
               aria-label="画像をアップロード"
             >
-              <ImageIcon className="h-5 w-5" />
+              {isUploading ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <ImageIcon className="h-5 w-5" />
+              )}
             </Button>
             <input
               ref={fileInputRef}
@@ -261,11 +302,11 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
           type="button" 
           size="icon" 
           onClick={handleSubmit}
-          disabled={(!text.trim() && images.length === 0) || isLoading}
+          disabled={(!text.trim() && images.length === 0) || isLoading || isUploading}
           className="h-10 w-10 touch-manipulation active:scale-95 transition-transform"
           aria-label="メッセージを送信"
         >
-          {isLoading ? (
+          {isLoading || isUploading ? (
             <Loader2 className="h-5 w-5 animate-spin" />
           ) : (
             <SendIcon className="h-5 w-5" />
