@@ -58,6 +58,11 @@ export function Markdown({ content, className }: MarkdownProps) {
   const isDark = resolvedTheme === 'dark';
   const [mermaidSvg, setMermaidSvg] = useState<Record<string, string>>({});
 
+  // 空のコンテンツの場合は何も表示しない
+  if (!content || content.trim() === '') {
+    return null;
+  }
+
   // Mermaidダイアグラムをレンダリング
   useEffect(() => {
     const renderMermaid = async () => {

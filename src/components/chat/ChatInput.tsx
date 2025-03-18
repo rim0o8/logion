@@ -6,6 +6,30 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ImageIcon, Loader2, Mic, Send, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+// APIを使って画像をアップロードする関数
+async function uploadImageToServer(base64: string, fileName?: string): Promise<string> {
+  try {
+    const response = await fetch("/api/upload", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ imageData: base64, fileName }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "画像のアップロードに失敗しました");
+    }
+
+    const data = await response.json();
+    return data.url;
+  } catch (error) {
+    console.error("サーバーへの画像アップロードエラー:", error);
+    throw error;
+  }
+}
+
 interface ChatInputProps {
   onSubmit: (content: MessageContent) => void;
   isLoading?: boolean;
@@ -22,6 +46,7 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [isVoiceRecording, setIsVoiceRecording] = useState(false);
+  const [isComposing, setIsComposing] = useState(false);
   
   // モデルが画像入力をサポートしているかを確認
   const imageInputSupported = supportsImageInput(modelId);
@@ -49,218 +74,195 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
     setText(textarea.value);
   };
 
-  // contentが変更されたときにテキストエリアの高さを調整
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      const newHeight = Math.min(Math.max(textareaRef.current.scrollHeight, 40), 200);
-      textareaRef.current.style.height = `${newHeight}px`;
-    }
-  }, []);
-
-  // フォーカス時にスクロール位置を調整
-  const handleFocus = () => {
-    setIsFocused(true);
-  };
-
-  const handleBlur = () => {
-    setIsFocused(false);
-  };
-
-  const handleSubmit = () => {
-    if ((!text.trim() && images.length === 0) || isLoading) return;
-    
-    // テキストのみの場合は文字列として送信
-    if (text.trim() && images.length === 0) {
-      onSubmit(text);
-      setText("");
+  // テキスト入力時のキーボードイベント処理
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // 日本語入力中（IME変換中）は何もしない
+    if (e.nativeEvent.isComposing || isComposing) {
       return;
     }
     
-    // マルチモーダルコンテンツの場合は配列として送信
-    const contentItems: MessageContentItem[] = [];
-    
-    if (text.trim()) {
-      contentItems.push({
-        type: 'text',
-        text: text.trim()
-      });
+    // Shift+Enterの場合は改行を許可（そのまま）
+    if (e.key === 'Enter' && e.shiftKey) {
+      return;
     }
     
-    // 画像を追加
-    for (const image of images) {
-      contentItems.push({
-        type: 'image_url',
-        image_url: {
-          url: image.url
-        }
-      });
-    }
-    
-    onSubmit(contentItems);
-    setText("");
-    setImages([]);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+    // Enterキーでメッセージを送信
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit();
+      
+      // 送信可能な状態であれば送信する
+      trySubmitMessage();
     }
   };
 
-  // 音声入力の開始/停止をシミュレートする関数
+  // フォーカス状態の管理
+  const handleFocus = () => setIsFocused(true);
+  const handleBlur = () => setIsFocused(false);
+
+  // 音声録音の切り替え
   const toggleVoiceRecording = () => {
-    // ブラウザが音声認識をサポートしているか確認（実際には使用可能性を確認する必要あり）
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      setIsVoiceRecording(!isVoiceRecording);
-      
-      // ここでは実際の音声認識は実装せず、ボタンの状態変化のみをシミュレートします
-      // 実際の実装では、ブラウザのSpeech Recognition APIを使用することができます
-      
-      if (!isVoiceRecording) {
-        // 音声認識の開始をシミュレート
-        setTimeout(() => {
-          // 5秒後に停止し、サンプルテキストを追加
-          setIsVoiceRecording(false);
-          setText(prev => `${prev}${prev ? ' ' : ''}音声入力のサンプルテキストです。`);
-        }, 3000);
-      }
+    setIsVoiceRecording(!isVoiceRecording);
+    
+    // TODO: 実際の音声録音機能を実装
+    if (!isVoiceRecording) {
+      console.log('音声録音開始');
     } else {
-      // 音声認識をサポートしていない場合はアラートを表示
-      alert('お使いのブラウザは音声認識をサポートしていません。');
+      console.log('音声録音停止');
+      // 録音の音声テキストを設定
+      setText('音声入力テキストをここに設定');
     }
   };
 
+  // メッセージ送信処理
+  const handleSubmit = () => {
+    trySubmitMessage();
+  };
+
+  // 送信可能な状態かチェックしてから送信
+  const trySubmitMessage = () => {
+    // 送信不可能な状態なら何もしない
+    if (!canSubmit) return;
+    
+    // 日本語入力中なら何もしない（二重チェック）
+    if (isComposing) return;
+    
+    // メッセージを送信
+    submitMessage();
+  };
+
+  // メッセージの送信とリセット
+  const submitMessage = () => {
+    // 送信可能でない場合は処理を中止
+    if (!canSubmit || isComposing) return;
+    
+    const trimmedText = text.trim();
+    const hasText = trimmedText.length > 0;
+    const hasImages = images.length > 0;
+    
+    if (!hasText && !hasImages) return;
+    
+    // 送信するコンテンツを準備
+    if (!hasImages) {
+      // テキストのみの場合
+      onSubmit(trimmedText);
+    } else {
+      // 画像がある場合（テキストは任意）
+      const contentItems: MessageContentItem[] = [];
+      
+      // テキストがあれば追加
+      if (hasText) {
+        contentItems.push({
+          type: 'text',
+          text: trimmedText
+        });
+      }
+      
+      // 画像を追加
+      for (const image of images) {
+        contentItems.push({
+          type: 'image_url',
+          image_url: {
+            url: image.url
+          }
+        });
+      }
+      
+      onSubmit(contentItems);
+    }
+    
+    // 入力をリセット
+    setText('');
+    setImages([]);
+    
+    // テキストエリアの高さもリセット
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      // フォーカスを保持
+      textareaRef.current.focus();
+    }
+  };
+  
+  // 画像アップロード処理
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     
-    // 最大処理画像数（モバイル端末でのメモリ制限対策）
-    const maxImages = 3;
-    let processedCount = 0;
-    
     setIsUploading(true);
-    console.log('画像アップロード開始');
     
     try {
-      // 選択された各ファイルを処理
-      for (const file of Array.from(files)) {
-        // 処理画像数の制限
-        if (processedCount >= maxImages) {
-          console.warn(`最大${maxImages}枚までの画像を処理します。残りの画像はスキップされました。`);
-          break;
-        }
-        
-        // 画像ファイルのみを許可
-        if (!file.type.startsWith('image/')) continue;
-        
-        // ファイルサイズの確認（50MB以上は処理しない）
-        if (file.size > 50 * 1024 * 1024) {
-          console.error('ファイルが大きすぎます（50MB以上）。処理をスキップします。');
-          continue;
-        }
-        
-        try {
-          // 処理開始を伝えるUI表示があると良い（ここではコンソールログのみ）
-          console.log(`画像処理中: ${file.name}`);
-          
-          // 処理タイムアウト（30秒）
-          const timeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error('画像処理がタイムアウトしました')), 30000);
-          });
-          
-          // ユーティリティ関数を使用して画像を処理
-          const maxFileSize = 5 * 1024 * 1024; // 5MB
-          const processPromise = processImageFile(file, {
-            maxWidth: 1600,
-            maxHeight: 1600,
-            quality: 0.7,
-            format: 'image/jpeg',
-            sizeThreshold: maxFileSize, // 5MB以下は圧縮しない
-            targetSize: file.size > maxFileSize ? maxFileSize : undefined // 5MBより大きい場合のみ圧縮対象に
-          });
-          
-          // タイムアウトか処理完了のどちらか早い方
-          const { base64, file: compressedFile } = await Promise.race([
-            processPromise,
-            timeoutPromise
-          ]);
-          
-          console.log('画像処理完了:', compressedFile.name);
-          
-          // APIを呼び出して画像をアップロード
-          console.log('Firebase Storageにアップロード開始');
-          const response = await fetch('/api/upload', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ 
-              imageData: base64, 
-              fileName: compressedFile.name 
-            }),
-          });
-          
-          if (!response.ok) {
-            throw new Error(`アップロード失敗: ${response.status} ${response.statusText}`);
+      // 各ファイルを処理
+      const filePromises = Array.from(files).map(file => processImageFile(file));
+      const processedImages = await Promise.all(filePromises);
+      
+      // アップロードされた画像のURLを保持する配列
+      const uploadedImages: { url: string }[] = [];
+      
+      // 各画像をサーバーにアップロード
+      for (const img of processedImages) {
+        if (img) {
+          try {
+            // Firebase Storageに画像をアップロード
+            const imageUrl = await uploadImageToServer(img.base64, img.file.name);
+            uploadedImages.push({ url: imageUrl });
+          } catch (uploadError) {
+            console.error('Firebase画像アップロードエラー:', uploadError);
+            // エラーが発生してもBase64は使用可能なので、フォールバックとして使用
+            uploadedImages.push({ url: img.base64 });
           }
-          
-          const data = await response.json();
-          console.log('アップロード応答:', data);
-          
-          if (data.success && data.url) {
-            // アップロードされたURLを保存
-            setImages(prev => [...prev, { url: data.url }]);
-            processedCount++;
-            console.log('画像アップロード成功:', data.url);
-          } else {
-            throw new Error('アップロードレスポンスにURLがありません');
-          }
-        } catch (error) {
-          console.error('画像処理・アップロードエラー:', error);
-          // エラーメッセージをユーザーに表示する仕組みがあると良い
         }
       }
+      
+      // アップロードされた画像を追加
+      setImages(prevImages => [...prevImages, ...uploadedImages]);
+    } catch (error) {
+      console.error('画像アップロードエラー:', error);
+      // TODO: エラーハンドリング
     } finally {
       setIsUploading(false);
-      console.log('画像アップロード処理完了');
-      
       // ファイル選択をリセット
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     }
   };
-
+  
+  // 画像削除処理
   const removeImage = (index: number) => {
-    setImages(prev => {
-      const newImages = [...prev];
+    setImages(prevImages => {
+      const newImages = [...prevImages];
       newImages.splice(index, 1);
       return newImages;
     });
   };
 
-  // 送信ボタンを押せるかどうか
-  const canSubmit = Boolean((text.trim() || images.length > 0) && !isLoading);
+  // 日本語入力の開始を検知
+  const handleCompositionStart = () => {
+    setIsComposing(true);
+  };
+
+  // 日本語入力の終了を検知
+  const handleCompositionEnd = () => {
+    setIsComposing(false);
+  };
+
+  // 送信可能かどうかを判定
+  const canSubmit = Boolean(
+    // テキストが空でない、または画像がある
+    (text.trim() || images.length > 0) && 
+    // ロード中、アップロード中、音声録音中、日本語入力中ではない
+    !isLoading && 
+    !isUploading && 
+    !isVoiceRecording &&
+    !isComposing
+  );
 
   return (
-    <motion.div 
-      className={`relative bg-background rounded-t-xl border shadow-lg ${isFocused ? 'pb-4 sm:pb-4' : ''} pt-3 px-3 sm:px-4`}
-      style={isKeyboardVisible ? { 
-        position: 'relative', 
-        zIndex: 20,
-        paddingBottom: isKeyboardVisible ? '8px' : undefined 
-      } : undefined}
-      initial={{ y: 10, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.3 }}
-    >
+    <div className="relative">
       {/* 画像プレビュー */}
       <AnimatePresence>
         {images.length > 0 && (
           <motion.div 
-            className="flex flex-wrap gap-2 mb-3 overflow-x-auto pb-1.5 pt-0.5"
+            className="flex flex-wrap gap-2 mb-3 overflow-x-auto pb-1.5 pt-0.5 px-3 sm:px-4"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
@@ -297,7 +299,7 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
       </AnimatePresence>
 
       {/* 入力エリア */}
-      <div className="flex items-end gap-2">
+      <div className="flex items-end gap-2 px-3 sm:px-4 pb-3 pt-3">
         {/* 画像アップロードボタン */}
         {imageInputSupported && (
           <motion.div className="shrink-0" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
@@ -313,11 +315,11 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
             />
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               size="icon"
               onClick={() => fileInputRef.current?.click()}
               disabled={isLoading || isUploading}
-              className="h-10 w-10 rounded-full border-gray-200 touch-manipulation focus:border-primary transition-colors"
+              className="h-10 w-10 rounded-full touch-manipulation focus:ring-1 focus:ring-primary/30 transition-colors"
               aria-label="画像をアップロード"
             >
               {isUploading ? (
@@ -329,20 +331,22 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
           </motion.div>
         )}
         
-        {/* 音声入力ボタン */}
-        <motion.div className="shrink-0 hidden sm:block" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={toggleVoiceRecording}
-            disabled={isLoading}
-            className={`h-10 w-10 rounded-full border-gray-200 touch-manipulation transition-colors ${isVoiceRecording ? 'bg-primary text-primary-foreground' : ''}`}
-            aria-label={isVoiceRecording ? "音声入力を停止" : "音声で入力"}
-          >
-            <Mic className="h-5 w-5" />
-          </Button>
-        </motion.div>
+        {/* 音声入力ボタン - 非表示にしてシンプルに */}
+        {false && (
+          <motion.div className="shrink-0 hidden sm:block" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={toggleVoiceRecording}
+              disabled={isLoading}
+              className={`h-10 w-10 rounded-full touch-manipulation transition-colors ${isVoiceRecording ? 'bg-primary text-primary-foreground' : ''}`}
+              aria-label={isVoiceRecording ? "音声入力を停止" : "音声で入力"}
+            >
+              <Mic className="h-5 w-5" />
+            </Button>
+          </motion.div>
+        )}
 
         {/* テキスト入力エリア */}
         <div className="flex-1 relative">
@@ -353,8 +357,10 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
             onKeyDown={handleKeyDown}
             onFocus={handleFocus}
             onBlur={handleBlur}
+            onCompositionStart={handleCompositionStart}
+            onCompositionEnd={handleCompositionEnd}
             placeholder="メッセージを入力..."
-            className="w-full resize-none bg-muted/70 border-0 rounded-xl py-3 px-4 pr-12 outline-none text-base leading-relaxed min-h-[42px] max-h-[200px] overflow-auto focus:ring-2 focus:ring-primary/30 transition-shadow placeholder:text-muted-foreground/70"
+            className="w-full resize-none bg-muted/30 border-0 rounded-xl py-3 px-4 pr-12 outline-none text-base leading-relaxed min-h-[42px] max-h-[200px] overflow-auto focus:ring-1 focus:ring-primary/30 transition-shadow placeholder:text-muted-foreground/70"
             disabled={isLoading || isVoiceRecording}
             rows={1}
             spellCheck="false"
@@ -388,21 +394,6 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
           </motion.div>
         </div>
       </div>
-
-      {/* キーボード表示時には非表示にする注意書き */}
-      <AnimatePresence>
-        {!isKeyboardVisible && (
-          <motion.div 
-            className="mt-2 text-xs text-center text-muted-foreground px-1"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            Enterキーで送信、Shift+Enterで改行
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+    </div>
   );
 } 

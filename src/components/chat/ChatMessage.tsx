@@ -1,6 +1,6 @@
 import type { Message, MessageContentItem } from "@/lib/llm/types";
 import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { Bot, Copy, MoreHorizontal, User } from "lucide-react";
 import { useRef, useState } from "react";
 import { Markdown } from "../ui/Markdown";
@@ -20,15 +20,12 @@ export function ChatMessage({ message, isLoading }: ChatMessageProps) {
   // メッセージの内容をコピーする関数
   const copyMessageToClipboard = () => {
     if (!messageContentRef.current) return;
-    
     const text = getMessageText();
-    
     // クリップボードにコピー
     navigator.clipboard.writeText(text).then(() => {
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
     });
-    
     // メニューを閉じる
     setIsMenuOpen(false);
   };
@@ -58,6 +55,15 @@ export function ChatMessage({ message, isLoading }: ChatMessageProps) {
   // メッセージコンテンツを表示する関数
   const renderContent = () => {
     const { content } = message;
+    
+    // コンテンツが空の場合はローディングインジケーターのみ表示
+    const isEmpty = typeof content === 'string' 
+      ? content.trim() === '' 
+      : (!content || content.length === 0);
+      
+    if (isEmpty && isLoading) {
+      return null;
+    }
     
     // 文字列の場合（従来の形式）
     if (typeof content === 'string') {
@@ -139,16 +145,18 @@ export function ChatMessage({ message, isLoading }: ChatMessageProps) {
   };
 
   return (
-    <motion.div 
+    <div 
       className={cn(
         "flex items-start gap-2 sm:gap-4 py-2 sm:py-4 group relative",
         isUser ? "justify-end" : "justify-start"
       )}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.2 }}
       onClick={handleOutsideClick}
-      layout
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          setIsMenuOpen(false);
+        }
+      }}
+      role="presentation"
     >
       {/* アシスタントアイコン */}
       {!isUser && (
@@ -170,28 +178,29 @@ export function ChatMessage({ message, isLoading }: ChatMessageProps) {
             ? "bg-primary text-primary-foreground rounded-tr-sm" 
             : "bg-card text-card-foreground border dark:border-border dark:shadow-none rounded-tl-sm"
         )}
-        whileHover={{ scale: 1.01 }}
-        transition={{ type: "spring", stiffness: 400, damping: 20 }}
+        initial={{ opacity: 0, y: 5 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.15, ease: "easeOut" }}
       >
         {renderContent()}
 
         {/* ローディングインジケーター */}
-        {isLoading && (typeof message.content === 'string' ? message.content.length === 0 : false) && (
+        {isLoading && (
           <div className="flex items-center space-x-1.5 sm:space-x-2 mt-1.5 sm:mt-2">
             <motion.div 
               className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-primary" 
-              animate={{ scale: [1, 1.2, 1] }}
-              transition={{ duration: 1, repeat: Infinity, repeatType: "loop" }}
+              animate={{ scale: [1, 1.15, 1] }}
+              transition={{ duration: 0.8, repeat: Number.POSITIVE_INFINITY, repeatType: "loop" }}
             />
             <motion.div 
               className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-primary" 
-              animate={{ scale: [1, 1.2, 1] }}
-              transition={{ duration: 1, repeat: Infinity, repeatType: "loop", delay: 0.2 }}
+              animate={{ scale: [1, 1.15, 1] }}
+              transition={{ duration: 0.8, repeat: Number.POSITIVE_INFINITY, repeatType: "loop", delay: 0.2 }}
             />
             <motion.div 
               className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-primary" 
-              animate={{ scale: [1, 1.2, 1] }}
-              transition={{ duration: 1, repeat: Infinity, repeatType: "loop", delay: 0.4 }}
+              animate={{ scale: [1, 1.15, 1] }}
+              transition={{ duration: 0.8, repeat: Number.POSITIVE_INFINITY, repeatType: "loop", delay: 0.4 }}
             />
           </div>
         )}
@@ -214,24 +223,26 @@ export function ChatMessage({ message, isLoading }: ChatMessageProps) {
         )}
 
         {/* メニュー */}
-        {isMenuOpen && (
-          <motion.div
-            ref={menuRef}
-            className="absolute top-8 right-2 bg-popover text-popover-foreground shadow-md rounded-lg overflow-hidden z-10 border"
-            initial={{ opacity: 0, y: -5 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -5 }}
-          >
-            <button
-              type="button"
-              className="flex items-center gap-2 px-4 py-2.5 w-full text-left text-sm hover:bg-muted transition-colors"
-              onClick={copyMessageToClipboard}
+        <AnimatePresence>
+          {isMenuOpen && (
+            <motion.div
+              ref={menuRef}
+              className="absolute top-8 right-2 bg-popover text-popover-foreground shadow-md rounded-lg overflow-hidden z-10 border"
+              initial={{ opacity: 0, y: -5 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -5 }}
             >
-              <Copy className="h-4 w-4" />
-              <span>{isCopied ? "コピーしました" : "テキストをコピー"}</span>
-            </button>
-          </motion.div>
-        )}
+              <button
+                type="button"
+                className="flex items-center gap-2 px-4 py-2.5 w-full text-left text-sm hover:bg-muted transition-colors"
+                onClick={copyMessageToClipboard}
+              >
+                <Copy className="h-4 w-4" />
+                <span>{isCopied ? "コピーしました" : "テキストをコピー"}</span>
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
 
       {/* ユーザーアイコン */}
@@ -244,6 +255,6 @@ export function ChatMessage({ message, isLoading }: ChatMessageProps) {
           <User className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
         </motion.div>
       )}
-    </motion.div>
+    </div>
   );
 } 
