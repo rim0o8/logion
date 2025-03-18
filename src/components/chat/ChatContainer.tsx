@@ -1,7 +1,9 @@
 import { DEFAULT_MODEL } from '@/config/llm';
 import { useBannerAd } from '@/lib/ads/webAdManager';
 import type { Message, MessageContent } from "@/lib/llm/types";
+import { motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
+import { useSwipeable } from "react-swipeable";
 import { DummyBannerAd } from "../ads/DummyBannerAd";
 import { WebBannerAd } from "../ads/WebBannerAd";
 import { ChatInput } from "./ChatInput";
@@ -27,6 +29,7 @@ export function ChatContainer({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [viewportHeight, setViewportHeight] = useState<number>(0);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // ビューポートの高さを監視
   useEffect(() => {
@@ -91,10 +94,20 @@ export function ChatContainer({
 
   const handleSendMessage = (content: MessageContent) => {
     onSendMessage(content, selectedModel);
+    // メッセージ送信時にサイドバーを閉じる
+    setIsSidebarOpen(false);
   };
 
   // 広告表示ロジック
   const { showAd, adUnitId, isDummyAd, rotationInterval } = useBannerAd(selectedModel);
+
+  // スワイプジェスチャーハンドラーの設定
+  const swipeHandlers = useSwipeable({
+    onSwipedRight: () => setIsSidebarOpen(true),
+    onSwipedLeft: () => setIsSidebarOpen(false),
+    trackMouse: false,
+    delta: 50,
+  });
 
   // メッセージのキーを生成する関数
   const getMessageKey = (message: Message, index: number) => {
@@ -125,7 +138,50 @@ export function ChatContainer({
   } : {};
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full bg-background relative" {...swipeHandlers}>
+      {/* サイドパネル（モバイル用） */}
+      <motion.div 
+        className="fixed inset-y-0 left-0 w-3/4 max-w-xs bg-background border-r shadow-lg z-30"
+        initial={{ x: '-100%' }}
+        animate={{ x: isSidebarOpen ? 0 : '-100%' }}
+        transition={{ ease: 'easeInOut', duration: 0.3 }}
+      >
+        <div className="p-4 h-full flex flex-col">
+          <h3 className="text-xl font-semibold mb-4">チャット設定</h3>
+          {onSelectModel && (
+            <div className="mb-6">
+              <p className="text-sm text-muted-foreground mb-2">モデルを選択</p>
+              <ModelSelector 
+                selectedModel={selectedModel} 
+                onSelectModel={(model) => {
+                  onSelectModel(model);
+                  setIsSidebarOpen(false);
+                }} 
+              />
+            </div>
+          )}
+          <div className="flex-1" />
+          <button
+            type="button"
+            onClick={() => setIsSidebarOpen(false)}
+            className="w-full bg-primary text-primary-foreground py-2.5 rounded-md font-medium active:scale-95 transition-transform"
+          >
+            閉じる
+          </button>
+        </div>
+      </motion.div>
+
+      {/* オーバーレイ（サイドバー表示時） */}
+      {isSidebarOpen && (
+        <motion.div 
+          className="fixed inset-0 bg-black/40 z-20"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* メッセージエリア */}
       <div 
         ref={scrollContainerRef}
@@ -134,26 +190,54 @@ export function ChatContainer({
       >
         <div className="max-w-3xl mx-auto pt-4 sm:pt-6">
           {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] px-2 sm:px-4 text-center">
-              <h3 className="text-xl sm:text-2xl font-semibold text-foreground mb-2">
-                AIアシスタント
-              </h3>
-              <p className="text-sm sm:text-base text-muted-foreground max-w-md">
-                何でもお気軽にお尋ねください。情報提供、問題解決、アイデア出しなどをサポートします。
-              </p>
-              {onSelectModel && (
-                <div className="mt-4">
-                  <ModelSelector 
-                    selectedModel={selectedModel} 
-                    onSelectModel={onSelectModel} 
-                  />
+            <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] px-4 sm:px-6 text-center">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="w-full max-w-xs"
+              >
+                <h3 className="text-xl sm:text-2xl font-semibold text-foreground mb-3">
+                  AIアシスタント
+                </h3>
+                <p className="text-sm sm:text-base text-muted-foreground max-w-md mb-6">
+                  何でもお気軽にお尋ねください。情報提供、問題解決、アイデア出しなどをサポートします。
+                </p>
+                
+                <button
+                  type="button"
+                  onClick={() => setIsSidebarOpen(true)}
+                  className="w-full bg-primary/10 text-primary hover:bg-primary/20 py-3 px-4 rounded-lg mb-3 flex items-center justify-center gap-2 font-medium transition-colors"
+                >
+                  <span>モデルを選択</span>
+                </button>
+
+                <div className="mt-6 space-y-2">
+                  {['今日のニュースを教えて', '簡単なレシピを提案して', 'プログラミングについて学びたい'].map((suggestion, index) => (
+                    <motion.button
+                      key={suggestion}
+                      type="button"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: 0.1 * index }}
+                      className="w-full text-left p-3 border rounded-lg text-sm hover:bg-muted/50 transition-colors"
+                      onClick={() => handleSendMessage(suggestion)}
+                    >
+                      {suggestion}
+                    </motion.button>
+                  ))}
                 </div>
-              )}
+              </motion.div>
             </div>
           ) : (
-            <div className="px-2 sm:px-4 space-y-1 sm:space-y-2">
+            <div className="px-3 sm:px-4 space-y-1 sm:space-y-2 pb-2">
               {messages.map((message, index) => (
-                <div key={getMessageKey(message, index)}>
+                <motion.div 
+                  key={getMessageKey(message, index)}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
                   <ChatMessage
                     message={message}
                     isLoading={index === messages.length - 1 && isLoading && message.role === 'assistant'}
@@ -166,20 +250,20 @@ export function ChatContainer({
                       <div className="w-full flex justify-center my-2 sm:my-3">
                         {isDummyAd ? (
                           <DummyBannerAd
-                            className="w-full max-w-3xl"
+                            className="w-full max-w-3xl rounded-lg overflow-hidden"
                             modelId={selectedModel}
                             rotationInterval={rotationInterval}
                           />
                         ) : (
                           <WebBannerAd
                             adUnitId={adUnitId}
-                            className="w-full max-w-md h-16"
+                            className="w-full max-w-md h-16 rounded-lg overflow-hidden"
                           />
                         )}
                       </div>
                     ) : null
                   )}
-                </div>
+                </motion.div>
               ))}
               <div ref={messagesEndRef} className="h-4" />
             </div>
@@ -188,7 +272,7 @@ export function ChatContainer({
       </div>
 
       {/* 入力エリア */}
-      <div 
+      <motion.div 
         className={`fixed bottom-0 left-0 right-0 bg-background border-t z-10 dark:border-border ${isKeyboardVisible ? 'keyboard-visible' : ''}`}
         style={{ 
           position: 'fixed',
@@ -199,14 +283,30 @@ export function ChatContainer({
           transform: isKeyboardVisible ? 'translateY(0)' : 'translateY(0)',
           boxShadow: '0 -2px 10px rgba(0,0,0,0.05)'
         }}
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.3 }}
       >
-        <div className="max-w-3xl mx-auto px-2 sm:px-4 pb-safe">
+        <div className="max-w-3xl mx-auto px-3 sm:px-4 pb-safe">
           <div className={`flex items-center justify-between gap-2 my-2 ${isKeyboardVisible ? 'hidden' : ''}`}>
+            <button
+              type="button"
+              onClick={() => setIsSidebarOpen(true)}
+              className="flex items-center justify-center p-2 rounded-md hover:bg-muted transition-colors"
+              aria-label="設定を開く"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M3 12H15M3 6H21M3 18H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            
             {onSelectModel && (
-              <ModelSelector 
-                selectedModel={selectedModel} 
-                onSelectModel={onSelectModel} 
-              />
+              <div className="hidden sm:block">
+                <ModelSelector 
+                  selectedModel={selectedModel} 
+                  onSelectModel={onSelectModel} 
+                />
+              </div>
             )}
           </div>
           <ChatInput 
@@ -220,7 +320,7 @@ export function ChatContainer({
             AIアシスタントは間違った情報を提供する可能性があります。重要な決断には必ず情報を検証してください。
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 } 

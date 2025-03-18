@@ -2,7 +2,8 @@ import { Button } from "@/components/ui/button";
 import { supportsImageInput } from "@/config/model-capabilities";
 import type { MessageContent, MessageContentItem } from "@/lib/llm/types";
 import { processImageFile } from "@/lib/utils/imageProcessing";
-import { ImageIcon, Loader2, SendIcon, X } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ImageIcon, Loader2, Mic, Send, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 interface ChatInputProps {
@@ -20,6 +21,7 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isFocused, setIsFocused] = useState(false);
+  const [isVoiceRecording, setIsVoiceRecording] = useState(false);
   
   // モデルが画像入力をサポートしているかを確認
   const imageInputSupported = supportsImageInput(modelId);
@@ -59,9 +61,6 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
   // フォーカス時にスクロール位置を調整
   const handleFocus = () => {
     setIsFocused(true);
-    // モバイルでキーボードが表示された時のスクロール処理は
-    // ChatContainerコンポーネントのvisualViewport処理に任せる
-    // スクロール処理を削除
   };
 
   const handleBlur = () => {
@@ -107,6 +106,29 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       handleSubmit();
+    }
+  };
+
+  // 音声入力の開始/停止をシミュレートする関数
+  const toggleVoiceRecording = () => {
+    // ブラウザが音声認識をサポートしているか確認（実際には使用可能性を確認する必要あり）
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      setIsVoiceRecording(!isVoiceRecording);
+      
+      // ここでは実際の音声認識は実装せず、ボタンの状態変化のみをシミュレートします
+      // 実際の実装では、ブラウザのSpeech Recognition APIを使用することができます
+      
+      if (!isVoiceRecording) {
+        // 音声認識の開始をシミュレート
+        setTimeout(() => {
+          // 5秒後に停止し、サンプルテキストを追加
+          setIsVoiceRecording(false);
+          setText(prev => `${prev}${prev ? ' ' : ''}音声入力のサンプルテキストです。`);
+        }, 3000);
+      }
+    } else {
+      // 音声認識をサポートしていない場合はアラートを表示
+      alert('お使いのブラウザは音声認識をサポートしていません。');
     }
   };
 
@@ -219,41 +241,112 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
     });
   };
 
+  // 送信ボタンを押せるかどうか
+  const canSubmit = Boolean((text.trim() || images.length > 0) && !isLoading);
+
   return (
-    <div 
-      className={`border-t bg-background p-2 sm:p-4 ${isFocused ? 'pb-4 sm:pb-6' : ''}`}
+    <motion.div 
+      className={`relative bg-background rounded-t-xl border shadow-lg ${isFocused ? 'pb-4 sm:pb-4' : ''} pt-3 px-3 sm:px-4`}
       style={isKeyboardVisible ? { 
         position: 'relative', 
         zIndex: 20,
         paddingBottom: isKeyboardVisible ? '8px' : undefined 
       } : undefined}
+      initial={{ y: 10, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.3 }}
     >
       {/* 画像プレビュー */}
-      {images.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-3 overflow-x-auto pb-1">
-          {images.map((image, i) => (
-            <div key={`image-${i}`} className="relative">
-              <img 
-                src={image.url} 
-                alt="アップロード画像" 
-                className="h-16 w-16 sm:h-20 sm:w-20 object-cover rounded-md border shadow-sm"
-              />
-              <button
-                type="button"
-                onClick={() => removeImage(i)}
-                className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1.5 touch-manipulation shadow-sm active:scale-95 transition-transform"
-                aria-label="画像を削除"
+      <AnimatePresence>
+        {images.length > 0 && (
+          <motion.div 
+            className="flex flex-wrap gap-2 mb-3 overflow-x-auto pb-1.5 pt-0.5"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            {images.map((image, i) => (
+              <motion.div 
+                key={`image-url-${image.url.substring(0, 8)}-${i}`}
+                className="relative"
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.8, opacity: 0 }}
+                transition={{ duration: 0.2 }}
               >
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-      
+                <img 
+                  src={image.url} 
+                  alt="アップロード画像" 
+                  className="h-16 w-16 sm:h-20 sm:w-20 object-cover rounded-md border shadow-sm"
+                />
+                <motion.button
+                  type="button"
+                  onClick={() => removeImage(i)}
+                  className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1.5 touch-manipulation shadow-sm active:scale-95 transition-transform"
+                  aria-label="画像を削除"
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                >
+                  <X className="h-3 w-3" />
+                </motion.button>
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 入力エリア */}
       <div className="flex items-end gap-2">
-        <div className="relative flex-1">
-          <textarea
+        {/* 画像アップロードボタン */}
+        {imageInputSupported && (
+          <motion.div className="shrink-0" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <input
+              id="image-upload"
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*"
+              onChange={handleImageUpload}
+              className="hidden"
+              disabled={isLoading || isUploading}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isLoading || isUploading}
+              className="h-10 w-10 rounded-full border-gray-200 touch-manipulation focus:border-primary transition-colors"
+              aria-label="画像をアップロード"
+            >
+              {isUploading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ImageIcon className="h-5 w-5" />
+              )}
+            </Button>
+          </motion.div>
+        )}
+        
+        {/* 音声入力ボタン */}
+        <motion.div className="shrink-0 hidden sm:block" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={toggleVoiceRecording}
+            disabled={isLoading}
+            className={`h-10 w-10 rounded-full border-gray-200 touch-manipulation transition-colors ${isVoiceRecording ? 'bg-primary text-primary-foreground' : ''}`}
+            aria-label={isVoiceRecording ? "音声入力を停止" : "音声で入力"}
+          >
+            <Mic className="h-5 w-5" />
+          </Button>
+        </motion.div>
+
+        {/* テキスト入力エリア */}
+        <div className="flex-1 relative">
+          <motion.textarea
             ref={textareaRef}
             value={text}
             onChange={autoResizeTextarea}
@@ -261,58 +354,55 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
             onFocus={handleFocus}
             onBlur={handleBlur}
             placeholder="メッセージを入力..."
-            className="resize-none w-full rounded-md border border-input bg-background px-3 py-2.5 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[44px] max-h-[200px]"
+            className="w-full resize-none bg-muted/70 border-0 rounded-xl py-3 px-4 pr-12 outline-none text-base leading-relaxed min-h-[42px] max-h-[200px] overflow-auto focus:ring-2 focus:ring-primary/30 transition-shadow placeholder:text-muted-foreground/70"
+            disabled={isLoading || isVoiceRecording}
+            rows={1}
+            spellCheck="false"
             style={{ 
-              height: '44px',
-              ...(isKeyboardVisible && viewportHeight ? { maxHeight: `${viewportHeight * 0.2}px` } : {})
+              height: 'auto', // 初期高さは自動調整
+              fontSize: isKeyboardVisible ? '16px' : undefined // iOS でズームしないように 16px 以上に
             }}
           />
-        </div>
-        
-        {/* 画像アップロードボタン - モデルがサポートしている場合のみ表示 */}
-        {imageInputSupported && (
-          <div className="relative">
+          
+          {/* 送信ボタン */}
+          <motion.div 
+            className="absolute bottom-1.5 right-1.5"
+            initial={false}
+            animate={{ scale: canSubmit ? 1 : 0.8, opacity: canSubmit ? 1 : 0.6 }}
+            transition={{ duration: 0.2 }}
+          >
             <Button
               type="button"
+              onClick={handleSubmit}
+              disabled={!canSubmit}
               size="icon"
-              variant="outline"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isLoading || isUploading}
-              className="h-10 w-10 touch-manipulation active:scale-95 transition-transform"
-              aria-label="画像をアップロード"
+              className={`h-8 w-8 rounded-full shadow-sm ${canSubmit ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-muted text-muted-foreground'} touch-manipulation transition-colors`}
+              aria-label="送信"
             >
-              {isUploading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <ImageIcon className="h-5 w-5" />
+                <Send className="h-4 w-4" />
               )}
             </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handleImageUpload}
-              className="hidden"
-            />
-          </div>
-        )}
-        
-        <Button 
-          type="button" 
-          size="icon" 
-          onClick={handleSubmit}
-          disabled={(!text.trim() && images.length === 0) || isLoading || isUploading}
-          className="h-10 w-10 touch-manipulation active:scale-95 transition-transform"
-          aria-label="メッセージを送信"
-        >
-          {isLoading || isUploading ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
-          ) : (
-            <SendIcon className="h-5 w-5" />
-          )}
-        </Button>
+          </motion.div>
+        </div>
       </div>
-    </div>
+
+      {/* キーボード表示時には非表示にする注意書き */}
+      <AnimatePresence>
+        {!isKeyboardVisible && (
+          <motion.div 
+            className="mt-2 text-xs text-center text-muted-foreground px-1"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            Enterキーで送信、Shift+Enterで改行
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 } 

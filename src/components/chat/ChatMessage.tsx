@@ -1,6 +1,8 @@
 import type { Message, MessageContentItem } from "@/lib/llm/types";
 import { cn } from "@/lib/utils";
-import { Bot, User } from "lucide-react";
+import { motion } from "framer-motion";
+import { Bot, Copy, MoreHorizontal, User } from "lucide-react";
+import { useRef, useState } from "react";
 import { Markdown } from "../ui/Markdown";
 
 interface ChatMessageProps {
@@ -10,6 +12,48 @@ interface ChatMessageProps {
 
 export function ChatMessage({ message, isLoading }: ChatMessageProps) {
   const isUser = message.role === 'user';
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const messageContentRef = useRef<HTMLDivElement>(null);
+
+  // メッセージの内容をコピーする関数
+  const copyMessageToClipboard = () => {
+    if (!messageContentRef.current) return;
+    
+    const text = getMessageText();
+    
+    // クリップボードにコピー
+    navigator.clipboard.writeText(text).then(() => {
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    });
+    
+    // メニューを閉じる
+    setIsMenuOpen(false);
+  };
+  
+  // メッセージテキストを取得する関数
+  const getMessageText = (): string => {
+    const { content } = message;
+    
+    if (typeof content === 'string') {
+      return content;
+    }
+    
+    // 配列の場合は、テキスト部分だけを連結
+    return content
+      .filter(item => item.type === 'text' && item.text)
+      .map(item => (item as {type: 'text', text: string}).text)
+      .join("\n\n");
+  };
+
+  // メニューの外側をクリックした時に閉じる
+  const handleOutsideClick = (e: React.MouseEvent) => {
+    if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      setIsMenuOpen(false);
+    }
+  };
 
   // メッセージコンテンツを表示する関数
   const renderContent = () => {
@@ -47,24 +91,29 @@ export function ChatMessage({ message, isLoading }: ChatMessageProps) {
           
           if (item.type === 'image_url' && item.image_url) {
             return (
-              <button 
+              <motion.button 
                 key={uniqueKey} 
                 type="button"
-                className="max-w-full overflow-hidden bg-transparent border-0 p-0 cursor-zoom-in"
+                className="relative max-w-full overflow-hidden bg-transparent border-0 p-0 cursor-zoom-in transition-all duration-300 rounded-lg hover:shadow-lg"
                 onClick={(e) => {
                   const imgContainer = e.currentTarget;
                   const img = imgContainer.querySelector('img');
                   if (img) toggleImageExpand(img as HTMLImageElement);
                 }}
                 aria-label="画像を拡大/縮小"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
               >
-                <img 
+                <motion.img 
                   src={item.image_url.url} 
-                  alt="画像" 
+                  alt="画像"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }} 
+                  transition={{ duration: 0.3 }}
                   className="max-w-full max-h-[200px] sm:max-h-[300px] object-contain rounded-md shadow-sm hover:shadow-md transition-shadow"
                   loading="lazy"
                 />
-              </button>
+              </motion.button>
             );
           }
           
@@ -90,40 +139,111 @@ export function ChatMessage({ message, isLoading }: ChatMessageProps) {
   };
 
   return (
-    <div className={cn(
-      "flex items-start gap-2 sm:gap-4 py-2 sm:py-4 group",
-      isUser ? "justify-end" : "justify-start"
-    )}>
-      {/* モバイルでも小さいアイコンを表示 */}
+    <motion.div 
+      className={cn(
+        "flex items-start gap-2 sm:gap-4 py-2 sm:py-4 group relative",
+        isUser ? "justify-end" : "justify-start"
+      )}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.2 }}
+      onClick={handleOutsideClick}
+      layout
+    >
+      {/* アシスタントアイコン */}
       {!isUser && (
-        <div className="flex h-6 w-6 sm:h-8 sm:w-8 rounded-full bg-primary items-center justify-center shrink-0">
-          <Bot className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-primary-foreground" />
-        </div>
+        <motion.div 
+          className="flex h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-primary items-center justify-center shrink-0"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+        >
+          <Bot className="h-4 w-4 sm:h-5 sm:w-5 text-primary-foreground" />
+        </motion.div>
       )}
 
-      <div className={cn(
-        "rounded-xl sm:rounded-2xl px-3 py-2 sm:px-4 sm:py-3 max-w-[85%] sm:max-w-[80%] break-words",
-        isUser 
-          ? "bg-primary text-primary-foreground" 
-          : "bg-card text-card-foreground border shadow-sm dark:border-border dark:shadow-none"
-      )}>
+      {/* メッセージ本文 */}
+      <motion.div 
+        ref={messageContentRef}
+        className={cn(
+          "relative rounded-2xl px-3 py-2.5 sm:px-4 sm:py-3 max-w-[85%] sm:max-w-[80%] break-words shadow-sm",
+          isUser 
+            ? "bg-primary text-primary-foreground rounded-tr-sm" 
+            : "bg-card text-card-foreground border dark:border-border dark:shadow-none rounded-tl-sm"
+        )}
+        whileHover={{ scale: 1.01 }}
+        transition={{ type: "spring", stiffness: 400, damping: 20 }}
+      >
         {renderContent()}
 
+        {/* ローディングインジケーター */}
         {isLoading && (typeof message.content === 'string' ? message.content.length === 0 : false) && (
           <div className="flex items-center space-x-1.5 sm:space-x-2 mt-1.5 sm:mt-2">
-            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
-            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '200ms' }} />
-            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '400ms' }} />
+            <motion.div 
+              className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-primary" 
+              animate={{ scale: [1, 1.2, 1] }}
+              transition={{ duration: 1, repeat: Infinity, repeatType: "loop" }}
+            />
+            <motion.div 
+              className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-primary" 
+              animate={{ scale: [1, 1.2, 1] }}
+              transition={{ duration: 1, repeat: Infinity, repeatType: "loop", delay: 0.2 }}
+            />
+            <motion.div 
+              className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-primary" 
+              animate={{ scale: [1, 1.2, 1] }}
+              transition={{ duration: 1, repeat: Infinity, repeatType: "loop", delay: 0.4 }}
+            />
           </div>
         )}
-      </div>
 
-      {/* モバイルでも小さいアイコンを表示 */}
+        {/* コンテキストメニューボタン (アシスタントメッセージのみ) */}
+        {!isUser && !isLoading && (
+          <motion.button
+            type="button"
+            className="absolute right-2 top-2 p-1.5 rounded-full opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-muted/80 focus:outline-none transition-opacity"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsMenuOpen(!isMenuOpen);
+            }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            aria-label="メッセージオプション"
+          >
+            <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+          </motion.button>
+        )}
+
+        {/* メニュー */}
+        {isMenuOpen && (
+          <motion.div
+            ref={menuRef}
+            className="absolute top-8 right-2 bg-popover text-popover-foreground shadow-md rounded-lg overflow-hidden z-10 border"
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -5 }}
+          >
+            <button
+              type="button"
+              className="flex items-center gap-2 px-4 py-2.5 w-full text-left text-sm hover:bg-muted transition-colors"
+              onClick={copyMessageToClipboard}
+            >
+              <Copy className="h-4 w-4" />
+              <span>{isCopied ? "コピーしました" : "テキストをコピー"}</span>
+            </button>
+          </motion.div>
+        )}
+      </motion.div>
+
+      {/* ユーザーアイコン */}
       {isUser && (
-        <div className="flex h-6 w-6 sm:h-8 sm:w-8 rounded-full bg-muted items-center justify-center shrink-0">
-          <User className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-muted-foreground" />
-        </div>
+        <motion.div 
+          className="flex h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-muted items-center justify-center shrink-0"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+        >
+          <User className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+        </motion.div>
       )}
-    </div>
+    </motion.div>
   );
 } 
