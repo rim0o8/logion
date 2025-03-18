@@ -6,6 +6,30 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ImageIcon, Loader2, Mic, Send, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+// APIを使って画像をアップロードする関数
+async function uploadImageToServer(base64: string, fileName?: string): Promise<string> {
+  try {
+    const response = await fetch("/api/upload", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ imageData: base64, fileName }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "画像のアップロードに失敗しました");
+    }
+
+    const data = await response.json();
+    return data.url;
+  } catch (error) {
+    console.error("サーバーへの画像アップロードエラー:", error);
+    throw error;
+  }
+}
+
 interface ChatInputProps {
   onSubmit: (content: MessageContent) => void;
   isLoading?: boolean;
@@ -147,16 +171,26 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
       const filePromises = Array.from(files).map(file => processImageFile(file));
       const processedImages = await Promise.all(filePromises);
       
-      // 処理された画像を追加
-      setImages(prevImages => {
-        const newImages = [...prevImages];
-        for (const img of processedImages) {
-          if (img) {
-            newImages.push({ url: img.base64 });
+      // アップロードされた画像のURLを保持する配列
+      const uploadedImages: { url: string }[] = [];
+      
+      // 各画像をサーバーにアップロード
+      for (const img of processedImages) {
+        if (img) {
+          try {
+            // Firebase Storageに画像をアップロード
+            const imageUrl = await uploadImageToServer(img.base64, img.file.name);
+            uploadedImages.push({ url: imageUrl });
+          } catch (uploadError) {
+            console.error('Firebase画像アップロードエラー:', uploadError);
+            // エラーが発生してもBase64は使用可能なので、フォールバックとして使用
+            uploadedImages.push({ url: img.base64 });
           }
         }
-        return newImages;
-      });
+      }
+      
+      // アップロードされた画像を追加
+      setImages(prevImages => [...prevImages, ...uploadedImages]);
     } catch (error) {
       console.error('画像アップロードエラー:', error);
       // TODO: エラーハンドリング
