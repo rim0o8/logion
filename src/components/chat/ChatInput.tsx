@@ -271,16 +271,15 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
               aria-label="画像をアップロード"
             >
               <ImageIcon className="h-5 w-5" />
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleImageUpload}
-                className="absolute opacity-0 inset-0 w-full h-full cursor-pointer"
-                style={{ zIndex: 1 }}
-              />
             </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleImageUpload}
+              className="hidden"
+            />
           </div>
         )}
         
