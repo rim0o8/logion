@@ -16,7 +16,6 @@ interface ChatMessageListProps {
   rotationInterval: number;
   selectedModel: string;
   onSendMessage: (content: MessageContent) => void;
-  openSidebar: () => void;
   keyboardAdjustStyle: CSSProperties;
 }
 
@@ -29,7 +28,6 @@ export function ChatMessageList({
   rotationInterval,
   selectedModel,
   onSendMessage,
-  openSidebar,
   keyboardAdjustStyle
 }: ChatMessageListProps) {
   const { messagesEndRef, scrollContainerRef } = useAutoScroll();
@@ -62,7 +60,7 @@ export function ChatMessageList({
     >
       <div className="max-w-3xl mx-auto pt-4 sm:pt-6">
         {messages.length === 0 ? (
-          <ChatEmptyState onSendMessage={onSendMessage} openSidebar={openSidebar} />
+          <ChatEmptyState onSendMessage={onSendMessage} />
         ) : (
           <div className="px-4 sm:px-6 space-y-4 sm:space-y-6 pb-6">
             {messages.map((message, index) => (
