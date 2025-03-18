@@ -46,6 +46,7 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [isVoiceRecording, setIsVoiceRecording] = useState(false);
+  const [isComposing, setIsComposing] = useState(false);
   
   // モデルが画像入力をサポートしているかを確認
   const imageInputSupported = supportsImageInput(modelId);
@@ -75,19 +76,22 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
 
   // テキスト入力時のキーボードイベント処理
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // 日本語入力中（IME変換中）は何もしない
+    if (e.nativeEvent.isComposing || isComposing) {
+      return;
+    }
+    
     // Shift+Enterの場合は改行を許可（そのまま）
     if (e.key === 'Enter' && e.shiftKey) {
       return;
     }
     
-    // Enterキーでメッセージを送信（モバイルでの送信を防止するためにキャンセル）
+    // Enterキーでメッセージを送信
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       
-      // メッセージが空でなく、ロード中でなければ送信
-      if (canSubmit) {
-        submitMessage();
-      }
+      // 送信可能な状態であれば送信する
+      trySubmitMessage();
     }
   };
 
@@ -111,23 +115,42 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
 
   // メッセージ送信処理
   const handleSubmit = () => {
+    trySubmitMessage();
+  };
+
+  // 送信可能な状態かチェックしてから送信
+  const trySubmitMessage = () => {
+    // 送信不可能な状態なら何もしない
     if (!canSubmit) return;
+    
+    // 日本語入力中なら何もしない（二重チェック）
+    if (isComposing) return;
+    
+    // メッセージを送信
     submitMessage();
   };
 
   // メッセージの送信とリセット
   const submitMessage = () => {
-    const trimmedText = text.trim();
+    // 送信可能でない場合は処理を中止
+    if (!canSubmit || isComposing) return;
     
-    // 画像がない場合はテキストのみ送信
-    if (images.length === 0) {
+    const trimmedText = text.trim();
+    const hasText = trimmedText.length > 0;
+    const hasImages = images.length > 0;
+    
+    if (!hasText && !hasImages) return;
+    
+    // 送信するコンテンツを準備
+    if (!hasImages) {
+      // テキストのみの場合
       onSubmit(trimmedText);
     } else {
-      // 画像がある場合はテキストと画像を含むメッセージコンテンツを作成
+      // 画像がある場合（テキストは任意）
       const contentItems: MessageContentItem[] = [];
       
       // テキストがあれば追加
-      if (trimmedText) {
+      if (hasText) {
         contentItems.push({
           type: 'text',
           text: trimmedText
@@ -212,8 +235,26 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
     });
   };
 
-  // 送信ボタンを押せるかどうか
-  const canSubmit = Boolean((text.trim() || images.length > 0) && !isLoading);
+  // 日本語入力の開始を検知
+  const handleCompositionStart = () => {
+    setIsComposing(true);
+  };
+
+  // 日本語入力の終了を検知
+  const handleCompositionEnd = () => {
+    setIsComposing(false);
+  };
+
+  // 送信可能かどうかを判定
+  const canSubmit = Boolean(
+    // テキストが空でない、または画像がある
+    (text.trim() || images.length > 0) && 
+    // ロード中、アップロード中、音声録音中、日本語入力中ではない
+    !isLoading && 
+    !isUploading && 
+    !isVoiceRecording &&
+    !isComposing
+  );
 
   return (
     <div className="relative">
@@ -316,6 +357,8 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
             onKeyDown={handleKeyDown}
             onFocus={handleFocus}
             onBlur={handleBlur}
+            onCompositionStart={handleCompositionStart}
+            onCompositionEnd={handleCompositionEnd}
             placeholder="メッセージを入力..."
             className="w-full resize-none bg-muted/30 border-0 rounded-xl py-3 px-4 pr-12 outline-none text-base leading-relaxed min-h-[42px] max-h-[200px] overflow-auto focus:ring-1 focus:ring-primary/30 transition-shadow placeholder:text-muted-foreground/70"
             disabled={isLoading || isVoiceRecording}

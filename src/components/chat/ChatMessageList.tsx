@@ -1,55 +1,95 @@
 import type { Message, MessageContent } from "@/lib/llm/types";
-import { motion } from "framer-motion";
-import type { CSSProperties } from "react";
-import { DummyBannerAd } from "../ads/DummyBannerAd";
-import { WebBannerAd } from "../ads/WebBannerAd";
+import { AnimatePresence, motion } from "framer-motion";
+import type { CSSProperties, RefObject } from "react";
 import { ChatEmptyState } from "./ChatEmptyState";
 import { ChatMessage } from "./ChatMessage";
-import { useAutoScroll } from "./hooks/useAutoScroll";
+import { MessageAd } from "./MessageAd";
 
+/**
+ * チャットメッセージリストのProps
+ */
 interface ChatMessageListProps {
+  // メッセージ関連
   messages: Message[];
   isLoading?: boolean;
-  showAd: boolean;
-  isDummyAd: boolean;
-  adUnitId: string;
-  rotationInterval: number;
-  selectedModel: string;
   onSendMessage: (content: MessageContent) => void;
-  keyboardAdjustStyle: CSSProperties;
+  
+  // 表示設定
+  keyboardAdjustStyle?: CSSProperties;
+  
+  // 広告表示設定
+  showAd?: boolean;
+  isDummyAd?: boolean;
+  adUnitId?: string;
+  rotationInterval?: number;
+  selectedModel?: string;
+  
+  // スクロール関連
+  messagesEndRef?: RefObject<HTMLDivElement>;
+  scrollContainerRef?: RefObject<HTMLDivElement>;
 }
 
+// メッセージアニメーションの設定
+const messageVariants = {
+  initial: { opacity: 0, y: 10 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -5 }
+};
+
+/**
+ * チャットメッセージリストコンポーネント
+ * メッセージの表示とスクロール管理を担当
+ */
 export function ChatMessageList({
+  // メッセージ関連
   messages,
   isLoading,
-  showAd,
-  isDummyAd,
-  adUnitId,
-  rotationInterval,
-  selectedModel,
   onSendMessage,
-  keyboardAdjustStyle
+  
+  // 表示設定
+  keyboardAdjustStyle = {},
+  
+  // 広告表示設定
+  showAd = false,
+  isDummyAd = false,
+  adUnitId = '',
+  rotationInterval = 5000,
+  selectedModel = '',
+  
+  // スクロール関連
+  messagesEndRef,
+  scrollContainerRef
 }: ChatMessageListProps) {
-  const { messagesEndRef, scrollContainerRef } = useAutoScroll();
-
   // メッセージのキーを生成する関数
-  const getMessageKey = (message: Message, index: number) => {
+  const getMessageKey = (message: Message, index: number): string => {
     if (typeof message.content === 'string') {
-      return `${message.content.slice(0, 10)}-${index}`;
+      return `${message.role}-${index}-${message.content.slice(0, 10)}`;
     }
     
     if (Array.isArray(message.content) && message.content.length > 0) {
       const firstItem = message.content[0];
       if (firstItem.type === 'text' && firstItem.text) {
-        return `${firstItem.text.slice(0, 10)}-${index}`;
+        return `${message.role}-${index}-${firstItem.text.slice(0, 10)}`;
       }
       
       if (firstItem.type === 'image_url') {
-        return `image-${index}`;
+        return `${message.role}-${index}-image`;
       }
     }
     
-    return `message-${index}`;
+    return `${message.role}-${index}`;
+  };
+
+  // 広告表示条件の判定
+  const shouldShowAdAfterMessage = (index: number): boolean => {
+    if (!showAd) return false;
+    
+    const message = messages[index];
+    if (message.role !== 'assistant') return false;
+    
+    // 最後のメッセージまたは次のメッセージがユーザーのメッセージの場合
+    return index === messages.length - 1 || 
+      (index + 1 < messages.length && messages[index + 1].role === 'user');
   };
 
   return (
@@ -63,44 +103,38 @@ export function ChatMessageList({
           <ChatEmptyState onSendMessage={onSendMessage} />
         ) : (
           <div className="px-4 sm:px-6 space-y-4 sm:space-y-6 pb-6">
-            {messages.map((message, index) => (
-              <motion.div 
-                key={getMessageKey(message, index)}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                className="relative"
-              >
-                {/* メッセージ表示 */}
-                <ChatMessage
-                  message={message}
-                  isLoading={index === messages.length - 1 && isLoading && message.role === 'assistant'}
-                />
-                
-                {/* 設定に基づいて広告を表示 */}
-                {showAd && message.role === 'assistant' && (
-                  (index === messages.length - 1 || 
-                   (index + 1 < messages.length && messages[index + 1].role === 'user')) ? (
-                    <div className="w-full flex justify-center my-2 sm:my-3 opacity-95">
-                      {isDummyAd ? (
-                        <DummyBannerAd
-                          className="w-full max-w-3xl rounded-lg overflow-hidden shadow-sm"
-                          modelId={selectedModel}
-                          rotationInterval={rotationInterval}
-                        />
-                      ) : (
-                        <WebBannerAd
-                          adUnitId={adUnitId}
-                          className="w-full max-w-md h-16 rounded-lg overflow-hidden shadow-sm"
-                        />
-                      )}
-                    </div>
-                  ) : null
-                )}
-              </motion.div>
-            ))}
-            {/* スクロール位置調整用の余白 - 入力エリアとの相性を改善 */}
-            <div ref={messagesEndRef} className="h-12" />
+            <AnimatePresence initial={false}>
+              {messages.map((message, index) => (
+                <motion.div 
+                  key={getMessageKey(message, index)}
+                  variants={messageVariants}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  transition={{ 
+                    duration: 0.15, 
+                    ease: "easeOut"
+                  }}
+                  className="relative"
+                >
+                  {/* メッセージ表示 */}
+                  <ChatMessage
+                    message={message}
+                    isLoading={index === messages.length - 1 && isLoading && message.role === 'assistant'}
+                  />
+                  
+                  {/* 広告表示 */}
+                  {shouldShowAdAfterMessage(index) && (
+                    <MessageAd 
+                      isDummy={isDummyAd} 
+                      adUnitId={adUnitId}
+                      modelId={selectedModel}
+                      rotationInterval={rotationInterval}
+                    />
+                  )}
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </div>
         )}
       </div>

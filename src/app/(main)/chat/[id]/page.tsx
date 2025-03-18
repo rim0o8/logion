@@ -108,13 +108,15 @@ export default function ChatPage() {
           stream: true,
           model: modelToUse, // モデルを指定
           conversationId: conversationId, // 会話IDを追加
-          userId: session?.user?.email || session?.email,
-          userEmail: session?.user?.email || session?.email,
+          userId: session?.user?.email || 'anonymous',
+          userEmail: session?.user?.email || session?.email || 'anonymous',
         }),
       });
 
       if (!response.ok) {
-        throw new Error('APIエラーが発生しました');
+        const errorData = await response.json().catch(() => ({}));
+        console.error('APIレスポンスエラー:', response.status, errorData);
+        throw new Error(`APIエラー: ${response.status} ${errorData.error || ''}`);
       }
 
       if (!response.body) {
@@ -129,25 +131,31 @@ export default function ChatPage() {
         const { done, value } = await reader.read();
         if (done) break;
 
-        // デコードしてJSONを解析
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n').filter(line => line.trim() !== '');
+        try {
+          // デコードしてJSONを解析
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n').filter(line => line.trim() !== '');
 
-        for (const line of lines) {
-          try {
-            const data = JSON.parse(line);
+          for (const line of lines) {
+            try {
+              const data = JSON.parse(line);
 
-            if (data.type === 'chunk') {
-              // ストリーミングコンテンツを更新
-              setStreamingContent(data.content);
-            } else if (data.type === 'done') {
-              // 完了したメッセージを追加
-              setMessages(prev => [...prev, data.message]);
-              setStreamingContent(null);
+              if (data.type === 'chunk') {
+                // ストリーミングコンテンツを更新
+                setStreamingContent(data.content);
+              } else if (data.type === 'done') {
+                // 完了したメッセージを追加
+                setMessages(prev => [...prev, data.message]);
+                setStreamingContent(null);
+              }
+            } catch (e) {
+              console.error('JSONの解析に失敗しました:', line, e);
             }
-          } catch (e) {
-            console.error('JSONの解析に失敗しました:', line, e);
           }
+        } catch (error) {
+          console.error('チャンクの処理中にエラーが発生しました:', error);
+          // チャンク処理エラー時もストリーミングをリセット
+          setStreamingContent(null);
         }
       }
 
@@ -158,7 +166,7 @@ export default function ChatPage() {
 
     } catch (error) {
       console.error('エラー:', error);
-      alert('メッセージの送信に失敗しました');
+      alert(`メッセージの送信に失敗しました: ${error instanceof Error ? error.message : '不明なエラー'}`);
     } finally {
       setIsLoading(false);
     }
