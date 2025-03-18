@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { supportsImageInput } from "@/config/model-capabilities";
 import type { MessageContent, MessageContentItem } from "@/lib/llm/types";
+import { processImageFile } from "@/lib/utils/imageProcessing";
 import { ImageIcon, Loader2, SendIcon, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -108,7 +109,7 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     
@@ -117,87 +118,28 @@ export function ChatInput({ onSubmit, isLoading, modelId, isKeyboardVisible, vie
       // 画像ファイルのみを許可
       if (!file.type.startsWith('image/')) continue;
       
-      // 画像を圧縮して処理
-      compressImage(file).then(compressedFile => {
-        // FileReaderを使用してBase64形式に変換
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const base64Url = e.target?.result as string;
-          setImages(prev => [...prev, { url: base64Url, file: compressedFile }]);
-        };
-        reader.readAsDataURL(compressedFile);
-      });
+      try {
+        // ユーティリティ関数を使用して画像を処理
+        const maxFileSize = 5 * 1024 * 1024; // 5MB
+        const { base64, file: compressedFile } = await processImageFile(file, {
+          maxWidth: 1600,
+          maxHeight: 1600,
+          quality: 0.7,
+          format: 'image/jpeg',
+          sizeThreshold: maxFileSize, // 5MB以下は圧縮しない
+          targetSize: file.size > maxFileSize ? maxFileSize : undefined // 5MBより大きい場合のみ圧縮対象に
+        });
+        
+        setImages(prev => [...prev, { url: base64, file: compressedFile }]);
+      } catch (error) {
+        console.error('画像処理エラー:', error);
+      }
     }
     
     // ファイル選択をリセット
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-  };
-
-  // 画像を圧縮する関数
-  const compressImage = (file: File): Promise<File> => {
-    return new Promise((resolve) => {
-      // 5MBを超える場合のみ圧縮
-      if (file.size <= 5 * 1024 * 1024) {
-        resolve(file);
-        return;
-      }
-      
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
-        
-        img.onload = () => {
-          // 元のアスペクト比を維持
-          let width = img.width;
-          let height = img.height;
-          
-          // 大きすぎる画像はリサイズ
-          const MAX_WIDTH = 1600;
-          const MAX_HEIGHT = 1600;
-          
-          if (width > MAX_WIDTH) {
-            height = Math.round(height * (MAX_WIDTH / width));
-            width = MAX_WIDTH;
-          }
-          
-          if (height > MAX_HEIGHT) {
-            width = Math.round(width * (MAX_HEIGHT / height));
-            height = MAX_HEIGHT;
-          }
-          
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-          
-          // 品質を調整して圧縮（0.7は70%の品質）
-          canvas.toBlob(
-            (blob) => {
-              if (blob) {
-                // 新しいFileオブジェクトを作成
-                const compressedFile = new File(
-                  [blob],
-                  file.name,
-                  { type: 'image/jpeg', lastModified: Date.now() }
-                );
-                resolve(compressedFile);
-              } else {
-                // 圧縮に失敗した場合は元のファイルを使用
-                resolve(file);
-              }
-            },
-            'image/jpeg',
-            0.7
-          );
-        };
-      };
-    });
   };
 
   const removeImage = (index: number) => {
