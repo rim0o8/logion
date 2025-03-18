@@ -71,7 +71,7 @@ const authOptions: NextAuthOptions = {
           prompt: "consent",
           access_type: "offline",
           response_type: "code",
-          redirect_uri: "http://localhost:3000/api/auth/callback/google",
+          redirect_uri: Config.AUTH_REDIRECT_URI as string,
         },
       },
     }),

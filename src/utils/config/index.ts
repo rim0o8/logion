@@ -26,6 +26,7 @@ interface ConfigType {
     GOOGLE_CLIENT_ID: string;
     GOOGLE_CLIENT_SECRET: string;
     NEXTAUTH_SECRET: string;
+    AUTH_REDIRECT_URI: string;
     AUTH_FIREBASE_API_KEY: string;
     AUTH_FIREBASE_MESSAGING_SENDER_ID: string;
     AUTH_FIREBASE_APP_ID: string;
@@ -52,6 +53,7 @@ const config: ConfigType = {
     GOOGLE_CLIENT_ID: GetEnv('GOOGLE_CLIENT_ID', true),
     GOOGLE_CLIENT_SECRET: GetEnv('GOOGLE_CLIENT_SECRET', true),
     NEXTAUTH_SECRET: GetEnv('NEXTAUTH_SECRET', false) || '',
+    AUTH_REDIRECT_URI: GetEnv('AUTH_REDIRECT_URI', false) || '',
     AUTH_FIREBASE_API_KEY: GetEnv('AUTH_FIREBASE_API_KEY', false) || '',
     AUTH_FIREBASE_MESSAGING_SENDER_ID: GetEnv('AUTH_FIREBASE_MESSAGING_SENDER_ID', false) || '',
     AUTH_FIREBASE_APP_ID: GetEnv('AUTH_FIREBASE_APP_ID', false) || '',
