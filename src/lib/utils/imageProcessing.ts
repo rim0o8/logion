@@ -36,25 +36,58 @@ export const compressImage = async (
 
   // 画像をロード
   const loadImage = (): Promise<HTMLImageElement> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
-        img.onload = () => resolve(img);
-      };
+    return new Promise((resolve, reject) => {
+      try {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+          try {
+            const img = new Image();
+            img.crossOrigin = 'anonymous'; // CORSエラー対策
+            img.src = event.target?.result as string;
+            img.onload = () => resolve(img);
+            img.onerror = (err) => {
+              console.error('画像の読み込みエラー:', err);
+              reject(new Error('画像の読み込みに失敗しました'));
+            };
+          } catch (err) {
+            console.error('画像オブジェクト作成エラー:', err);
+            reject(err);
+          }
+        };
+        reader.onerror = (err) => {
+          console.error('FileReader エラー:', err);
+          reject(err);
+        };
+      } catch (err) {
+        console.error('loadImage 全体エラー:', err);
+        reject(err);
+      }
     });
   };
 
   // 画像をキャンバスに描画
   const drawImageToCanvas = (img: HTMLImageElement, width: number, height: number): HTMLCanvasElement => {
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    ctx?.drawImage(img, 0, 0, width, height);
-    return canvas;
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        console.warn('2Dコンテキストを取得できませんでした');
+        // フォールバックとして空のキャンバスを返す
+        return canvas;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      return canvas;
+    } catch (err) {
+      console.error('キャンバス描画エラー:', err);
+      // エラー時は空のキャンバスを返す
+      const fallbackCanvas = document.createElement('canvas');
+      fallbackCanvas.width = Math.min(width, 800); // モバイルデバイスでも安全なサイズ
+      fallbackCanvas.height = Math.min(height, 800);
+      return fallbackCanvas;
+    }
   };
 
   // ターゲットサイズまで圧縮を繰り返す関数
@@ -86,7 +119,52 @@ export const compressImage = async (
     // ブロブを取得する関数
     const getBlob = (canvas: HTMLCanvasElement, quality: number): Promise<Blob | null> => {
       return new Promise((resolve) => {
-        canvas.toBlob((blob) => resolve(blob), format, quality);
+        try {
+          // モバイルデバイスでのメモリ使用量制限
+          const maxDimension = 2048; // 多くのモバイルデバイスで安全な上限
+          let finalCanvas = canvas;
+          
+          // キャンバスサイズが大きすぎる場合は縮小
+          if (canvas.width > maxDimension || canvas.height > maxDimension) {
+            console.log(`キャンバスサイズが大きすぎるため縮小します: ${canvas.width}x${canvas.height} -> 最大${maxDimension}px`);
+            const tempCanvas = document.createElement('canvas');
+            let newWidth = canvas.width;
+            let newHeight = canvas.height;
+            
+            if (canvas.width > canvas.height) {
+              newWidth = maxDimension;
+              newHeight = Math.floor(canvas.height * (maxDimension / canvas.width));
+            } else {
+              newHeight = maxDimension;
+              newWidth = Math.floor(canvas.width * (maxDimension / canvas.height));
+            }
+            
+            tempCanvas.width = newWidth;
+            tempCanvas.height = newHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx?.drawImage(canvas, 0, 0, newWidth, newHeight);
+            finalCanvas = tempCanvas;
+          }
+          
+          // タイムアウト設定（10秒で処理が完了しない場合は中断）
+          const timeoutId = setTimeout(() => {
+            console.warn('Blob取得がタイムアウトしました');
+            resolve(null);
+          },
+          10000);
+          
+          finalCanvas.toBlob(
+            (blob) => {
+              clearTimeout(timeoutId);
+              resolve(blob);
+            },
+            format,
+            quality
+          );
+        } catch (err) {
+          console.error('Blob取得エラー:', err);
+          resolve(null);
+        }
       });
     };
 
@@ -220,7 +298,48 @@ export const processImageFile = async (
   file: File,
   compressOptions?: Parameters<typeof compressImage>[1]
 ): Promise<{ base64: string; file: File }> => {
-  const compressedFile = await compressImage(file, compressOptions);
-  const base64 = await fileToBase64(compressedFile);
-  return { base64, file: compressedFile };
+  try {
+    // モバイルデバイス検出
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
+    // モバイルデバイスの場合、より保守的な設定を適用
+    const mobileOptions = isMobile ? {
+      maxWidth: 1200, // モバイルでは小さめに
+      maxHeight: 1200,
+      quality: 0.6,   // 品質も少し下げる
+      ...compressOptions
+    } : compressOptions;
+    
+    // まずファイルが処理可能かチェック
+    if (file.size > 100 * 1024 * 1024) { // 100MB超は処理しない
+      console.warn('ファイルが大きすぎるため、圧縮せずに返します');
+      return { 
+        base64: await fileToBase64(file),
+        file 
+      };
+    }
+    
+    console.time('画像圧縮処理');
+    const compressedFile = await compressImage(file, mobileOptions);
+    console.timeEnd('画像圧縮処理');
+    
+    console.time('Base64変換');
+    const base64 = await fileToBase64(compressedFile);
+    console.timeEnd('Base64変換');
+    
+    return { base64, file: compressedFile };
+  } catch (error) {
+    console.error('画像処理全体のエラー:', error);
+    // エラー時は元のファイルをそのまま返す
+    try {
+      return { 
+        base64: await fileToBase64(file),
+        file 
+      };
+    } catch (e) {
+      // Base64変換もできない場合は空のデータを返す
+      console.error('Base64変換にも失敗:', e);
+      throw new Error('画像処理に失敗しました');
+    }
+  }
 }; 
