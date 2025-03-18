@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useSwipeable } from "react-swipeable";
 import { ChatInputArea } from "./ChatInputArea";
 import { ChatMessageList } from "./ChatMessageList";
-import { ChatSidebar } from "./ChatSidebar";
+import { ChatSidebar } from './ChatSidebar';
 import { useViewportHeight } from "./hooks/useViewportHeight";
 
 interface ChatContainerProps {
@@ -46,7 +46,7 @@ export function ChatContainer({
   const openSidebar = () => setIsSidebarOpen(true);
 
   return (
-    <div className="flex flex-col h-full bg-background relative" {...swipeHandlers}>
+    <div className="flex flex-col h-full bg-background relative overflow-hidden" {...swipeHandlers}>
       <ChatSidebar 
         isSidebarOpen={isSidebarOpen}
         setIsSidebarOpen={setIsSidebarOpen}
@@ -73,7 +73,6 @@ export function ChatContainer({
         isKeyboardVisible={isKeyboardVisible}
         viewportHeight={viewportHeight}
         selectedModel={selectedModel}
-        onSelectModel={onSelectModel}
         openSidebar={openSidebar}
       />
     </div>

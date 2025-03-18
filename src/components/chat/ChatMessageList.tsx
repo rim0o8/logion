@@ -57,21 +57,23 @@ export function ChatMessageList({
   return (
     <div 
       ref={scrollContainerRef}
-      className="flex-1 overflow-y-auto pb-36 sm:pb-32 bg-background"
+      className="flex-1 overflow-y-auto pb-40 sm:pb-40 bg-background"
       style={keyboardAdjustStyle}
     >
       <div className="max-w-3xl mx-auto pt-4 sm:pt-6">
         {messages.length === 0 ? (
           <ChatEmptyState onSendMessage={onSendMessage} openSidebar={openSidebar} />
         ) : (
-          <div className="px-3 sm:px-4 space-y-1 sm:space-y-2 pb-2">
+          <div className="px-4 sm:px-6 space-y-4 sm:space-y-6 pb-6">
             {messages.map((message, index) => (
               <motion.div 
                 key={getMessageKey(message, index)}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3 }}
+                className="relative"
               >
+                {/* メッセージ表示 */}
                 <ChatMessage
                   message={message}
                   isLoading={index === messages.length - 1 && isLoading && message.role === 'assistant'}
@@ -81,17 +83,17 @@ export function ChatMessageList({
                 {showAd && message.role === 'assistant' && (
                   (index === messages.length - 1 || 
                    (index + 1 < messages.length && messages[index + 1].role === 'user')) ? (
-                    <div className="w-full flex justify-center my-2 sm:my-3">
+                    <div className="w-full flex justify-center my-2 sm:my-3 opacity-95">
                       {isDummyAd ? (
                         <DummyBannerAd
-                          className="w-full max-w-3xl rounded-lg overflow-hidden"
+                          className="w-full max-w-3xl rounded-lg overflow-hidden shadow-sm"
                           modelId={selectedModel}
                           rotationInterval={rotationInterval}
                         />
                       ) : (
                         <WebBannerAd
                           adUnitId={adUnitId}
-                          className="w-full max-w-md h-16 rounded-lg overflow-hidden"
+                          className="w-full max-w-md h-16 rounded-lg overflow-hidden shadow-sm"
                         />
                       )}
                     </div>
@@ -99,7 +101,8 @@ export function ChatMessageList({
                 )}
               </motion.div>
             ))}
-            <div ref={messagesEndRef} className="h-4" />
+            {/* スクロール位置調整用の余白 - 入力エリアとの相性を改善 */}
+            <div ref={messagesEndRef} className="h-12" />
           </div>
         )}
       </div>

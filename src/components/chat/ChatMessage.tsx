@@ -178,17 +178,17 @@ export function ChatMessage({ message, isLoading }: ChatMessageProps) {
             <motion.div 
               className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-primary" 
               animate={{ scale: [1, 1.2, 1] }}
-              transition={{ duration: 1, repeat: Infinity, repeatType: "loop" }}
+              transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, repeatType: "loop" }}
             />
             <motion.div 
               className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-primary" 
               animate={{ scale: [1, 1.2, 1] }}
-              transition={{ duration: 1, repeat: Infinity, repeatType: "loop", delay: 0.2 }}
+              transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, repeatType: "loop", delay: 0.2 }}
             />
             <motion.div 
               className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-primary" 
               animate={{ scale: [1, 1.2, 1] }}
-              transition={{ duration: 1, repeat: Infinity, repeatType: "loop", delay: 0.4 }}
+              transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, repeatType: "loop", delay: 0.4 }}
             />
           </div>
         )}
