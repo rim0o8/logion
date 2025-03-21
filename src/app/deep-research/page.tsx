@@ -1,77 +1,174 @@
-'use client';
+"use client";
 
-import { DeepResearchForm } from '@/features/deep-research/components/DeepResearchForm';
-import { ResearchProgress } from '@/features/deep-research/components/ResearchProgress';
-import { ResearchResult } from '@/features/deep-research/components/ResearchResult';
-import type { ClientResearchParams } from '@/lib/deep-research';
-import { useDeepResearch } from '@/lib/deep-research';
+import {
+    ErrorDisplay,
+    ProgressIndicator,
+    ResearchForm,
+    ResearchReport
+} from "@/components/deep-research";
+import { useEffect, useRef, useState } from "react";
 
 export default function DeepResearchPage() {
-  const { 
-    isResearching, 
-    progress, 
-    progressMessage, 
-    result, 
-    error, 
-    startResearch, 
-    cancelResearch 
-  } = useDeepResearch();
+  const [topic, setTopic] = useState("");
+  const [report, setReport] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [progressSteps, setProgressSteps] = useState<string[]>([]);
+  const readerRef = useRef<ReadableStreamDefaultReader | null>(null);
 
-  const handleSubmit = async (data: ClientResearchParams) => {
-    await startResearch(data);
+  // コンポーネントがアンマウントされたときにストリームをクリーンアップ
+  useEffect(() => {
+    return () => {
+      if (readerRef.current) {
+        readerRef.current.cancel().catch(console.error);
+      }
+    };
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!topic.trim()) return;
+
+    setLoading(true);
+    setError("");
+    setReport("");
+    setProgressSteps([]);
+    addProgressStep("リクエストを送信中...");
+
+    try {
+      const response = await fetch("/api/deep-research", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ topic }),
+      });
+
+      if (!response.ok || !response.body) {
+        throw new Error("サーバーからのレスポンスが無効です");
+      }
+
+      // レスポンスボディからリーダーを取得
+      const reader = response.body.getReader();
+      readerRef.current = reader;
+
+      // 読み取りループ
+      const processStream = async () => {
+        let receivedData = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          
+          if (done) {
+            console.log("Stream complete");
+            break;
+          }
+
+          // 受信したデータをデコード
+          const chunk = new TextDecoder().decode(value);
+          receivedData += chunk;
+          
+          console.log("受信データチャンク:", chunk.substring(0, 100) + "...");
+
+          // 改行で区切られたJSONオブジェクトを処理
+          const lines = receivedData.split('\n');
+          // 最後の不完全な行を保持
+          receivedData = lines.pop() || "";
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            
+            try {
+              const data = JSON.parse(line);
+              console.log("処理中のデータ:", data.type);
+              
+              // メッセージタイプによって処理を分岐
+              switch (data.type) {
+                case 'progress':
+                  addProgressStep(data.message);
+                  break;
+                case 'complete':
+                  if (data.report && data.report.trim()) {
+                    setReport(data.report);
+                    addProgressStep("レポートの生成が完了しました");
+                  } else {
+                    setError("レポートを生成できませんでした。別のトピックで試してください。");
+                    addProgressStep("レポート生成に失敗しました");
+                  }
+                  setLoading(false);
+                  break;
+                case 'error':
+                  throw new Error(data.error || "処理中にエラーが発生しました");
+                default:
+                  console.warn("未知のメッセージタイプ:", data.type);
+              }
+            } catch (err) {
+              console.error("JSON解析エラー:", err, line);
+              setError(err instanceof Error ? err.message : "データの解析中にエラーが発生しました");
+              setLoading(false);
+              return;
+            }
+          }
+        }
+      };
+
+      // ストリーム処理を開始
+      processStream().catch(err => {
+        console.error("ストリーム処理エラー:", err);
+        setError(err instanceof Error ? err.message : "ストリーム処理中にエラーが発生しました");
+        setLoading(false);
+      });
+    } catch (err) {
+      console.error("Error:", err);
+      setError(err instanceof Error ? err.message : "予期せぬエラーが発生しました");
+      addProgressStep("エラーが発生しました");
+      setLoading(false);
+    }
   };
 
-  const handleStartNewSearch = () => {
-    // リサーチをリセットして最初から始める
-    cancelResearch();
+  const addProgressStep = (step: string) => {
+    setProgressSteps(prev => [...prev, step]);
+  };
+
+  const handleNewSearch = () => {
+    // 現在のストリームがあればキャンセル
+    if (readerRef.current) {
+      readerRef.current.cancel().catch(console.error);
+      readerRef.current = null;
+    }
+    
+    setReport("");
+    setError("");
+    setProgressSteps([]);
   };
 
   return (
-    <div className="container py-8 max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6">ディープリサーチ</h1>
-      
-      <p className="mb-8 text-muted-foreground">
-        OpenAIとFirecrawl APIを使用して、任意のトピックについての包括的なリサーチを実行します。
-        AIがWeb検索、コンテンツ分析、そして深い洞察を行い、詳細なレポートを生成します。
-      </p>
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold mb-8 text-center">AIディープリサーチ</h1>
 
-      {!isResearching && !result && !error && (
-        <DeepResearchForm 
-          onSubmit={handleSubmit} 
-          formState={{ isResearching }} 
+      {!report && (
+        <ResearchForm
+          topic={topic}
+          setTopic={setTopic}
+          handleSubmit={handleSubmit}
+          loading={loading}
         />
       )}
 
-      {isResearching && (
-        <ResearchProgress
-          progress={progress}
-          message={progressMessage}
-          onCancel={cancelResearch}
+      {loading && <ProgressIndicator progressSteps={progressSteps} />}
+
+      {error && (
+        <ErrorDisplay
+          error={error}
+          handleNewSearch={handleNewSearch}
         />
       )}
 
-      {!isResearching && result && (
-        <ResearchResult
-          result={result}
-          // @ts-ignore ResearchResult component needs to be updated to include onNewSearch
-          onNewSearch={handleStartNewSearch}
+      {report && (
+        <ResearchReport
+          report={report}
+          handleNewSearch={handleNewSearch}
         />
-      )}
-
-      {!isResearching && error && (
-        <div className="bg-destructive/10 p-4 rounded-md border border-destructive">
-          <h2 className="text-xl font-semibold mb-2 text-destructive">エラーが発生しました</h2>
-          <p className="text-destructive-foreground">{error}</p>
-          <div className="mt-4">
-            <button
-              type="button"
-              onClick={handleStartNewSearch}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
-            >
-              もう一度試す
-            </button>
-          </div>
-        </div>
       )}
     </div>
   );

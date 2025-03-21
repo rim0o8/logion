@@ -1,11 +1,21 @@
-// Type definitions
-export * from './types';
+// Deep Research モジュールのエクスポート
+export * from './configuration';
+export * from './graph';
+export * from './state';
+export * from './utils';
 
-// API client
-export * from './api/client';
-
-// Hooks (frontend)
-export * from './hooks/useDeepResearch';
-
-// Engine (server-side only)
-export { DeepResearchEngine } from './engine/research-engine';
+// クライアント側で使用するためのリサーチパラメータインターフェース
+export interface ClientResearchParams {
+  topic: string;
+  model: string;
+  provider: string;
+  maxSearchDepth?: number;
+  numberOfQueries?: number;
+  searchApi?: string;
+  instructions?: string;
+  customPrompts?: {
+    plannerPrompt?: string;
+    sectionPrompt?: string;
+    finalPrompt?: string;
+  };
+} 

@@ -16,7 +16,7 @@
     "@langchain/anthropic": "^0.3.15",
     "@langchain/core": "^0.3.42",
     "@langchain/deepseek": "^0.0.1",
-    "@langchain/langgraph": "^0.2.55",
+    "@langchain/langgraph": "^0.2.57",
     "@langchain/openai": "^0.4.4",
     "@mendable/firecrawl-js": "^1.20.1",
     "@next-auth/firebase-adapter": "^1.0.0",
@@ -76,6 +76,7 @@
     "unified": "^11.0.5",
     "uuid": "^11.1.0",
     "vfile": "^6.0.3",
+    "vitest": "^3.0.9",
     "zod": "^3.24.1"
   },
   "devDependencies": {
