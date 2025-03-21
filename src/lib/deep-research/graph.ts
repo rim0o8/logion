@@ -7,27 +7,27 @@ import { Command, END, START, Send, StateGraph } from "@langchain/langgraph";
 import { ChatOpenAI } from "@langchain/openai";
 import { Configuration, SearchApiConfigOptions } from "./configuration";
 import {
-    finalSectionWriterInstructions,
-    queryWriterInstructions,
-    reportPlannerInstructions,
-    reportPlannerQueryWriterInstructions,
-    sectionGraderInstructions,
-    sectionWriterInstructions
+  finalSectionWriterInstructions,
+  queryWriterInstructions,
+  reportPlannerInstructions,
+  reportPlannerQueryWriterInstructions,
+  sectionGraderInstructions,
+  sectionWriterInstructions
 } from "./prompts";
 import {
-    Feedback,
-    ReportState,
-    SearchQuery,
-    Section,
-    SectionState
+  Feedback,
+  ReportState,
+  SearchQuery,
+  Section,
+  SectionState
 } from "./state";
 import {
-    SearchResult,
-    formatSearchResults,
-    formatSections,
-    getConfigValue,
-    getSearchParams,
-    selectAndExecuteSearch
+  SearchResult,
+  formatSearchResults,
+  formatSections,
+  getConfigValue,
+  getSearchParams,
+  selectAndExecuteSearch
 } from "./utils";
 
 // Helper to initialize chat model
@@ -241,17 +241,38 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
   console.log(`[DEBUG] セクション生成結果内容: ${contentStr.substring(0, 500)}...`);
   
   try {
-    // コンテンツをJSONとして解析してみる
+    // コンテンツをJSONとして解析する
     let contentData: Record<string, any>;
+    
+    // 制御文字を処理する前に、生データのままJSONとして解析を試みる
     try {
-      // 制御文字を除去してからJSONとして解析
-      const sanitizedContentStr = contentStr.replace(/[\x00-\x1F\x7F-\x9F]/g, '');
-      contentData = JSON.parse(sanitizedContentStr);
-      console.log(`[DEBUG] コンテンツをJSONとして解析成功`);
-    } catch (jsonError) {
-      // JSON解析に失敗した場合は、テキストそのものをコンテンツとして使用
-      console.log("[DEBUG] コンテンツのJSON解析に失敗しました。テキストをそのまま使用します。", jsonError);
-      contentData = { content: contentStr };
+      contentData = JSON.parse(contentStr);
+      console.log(`[DEBUG] 元のコンテンツをJSONとして解析成功`);
+    } catch (initialError) {
+      // 失敗した場合は制御文字を処理してからJSON解析
+      
+      // ステップ1: JSONで明示的に許可されている制御文字以外をスペースに置換
+      // JSON仕様に基づき、\n \r \t のみを保持し、その他の制御文字はスペースに
+      const cleanedContent = contentStr
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ');
+        
+      try {
+        contentData = JSON.parse(cleanedContent);
+        console.log(`[DEBUG] クリーニング後のコンテンツをJSONとして解析成功`);
+      } catch (cleanError) {
+        // それでも失敗する場合、厳格な対応として全制御文字をスペースに置換
+        const strictCleanedContent = contentStr
+          .replace(/[\x00-\x1F\x7F-\x9F]/g, ' ');
+          
+        try {
+          contentData = JSON.parse(strictCleanedContent);
+          console.log(`[DEBUG] 厳格クリーニング後のコンテンツをJSONとして解析成功`);
+        } catch (strictError) {
+          // すべての方法が失敗した場合は、テキストそのものをコンテンツとして使用
+          console.log("[DEBUG] すべてのJSON解析方法が失敗しました。テキストをそのまま使用します。", initialError);
+          contentData = { content: contentStr };
+        }
+      }
     }
     
     // Check if we have a valid sections array
@@ -706,17 +727,38 @@ ${sourceText || "No sources provided. Generate content based on general knowledg
   console.log(`[DEBUG] セクション「${section.name}」の生成されたコンテンツプレビュー:`, contentStr.substring(0, 200) + "...");
     
   try {
-    // コンテンツをJSONとして解析してみる
+    // コンテンツをJSONとして解析する
     let contentData: Record<string, any>;
+    
+    // 制御文字を処理する前に、生データのままJSONとして解析を試みる
     try {
-      // 制御文字を除去してからJSONとして解析
-      const sanitizedContentStr = contentStr.replace(/[\x00-\x1F\x7F-\x9F]/g, '');
-      contentData = JSON.parse(sanitizedContentStr);
-      console.log(`[DEBUG] コンテンツをJSONとして解析成功`);
-    } catch (jsonError) {
-      // JSON解析に失敗した場合は、テキストそのものをコンテンツとして使用
-      console.log("[DEBUG] コンテンツのJSON解析に失敗しました。テキストをそのまま使用します。", jsonError);
-      contentData = { content: contentStr };
+      contentData = JSON.parse(contentStr);
+      console.log(`[DEBUG] 元のコンテンツをJSONとして解析成功`);
+    } catch (initialError) {
+      // 失敗した場合は制御文字を処理してからJSON解析
+      
+      // ステップ1: JSONで明示的に許可されている制御文字以外をスペースに置換
+      // JSON仕様に基づき、\n \r \t のみを保持し、その他の制御文字はスペースに
+      const cleanedContent = contentStr
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ');
+        
+      try {
+        contentData = JSON.parse(cleanedContent);
+        console.log(`[DEBUG] クリーニング後のコンテンツをJSONとして解析成功`);
+      } catch (cleanError) {
+        // それでも失敗する場合、厳格な対応として全制御文字をスペースに置換
+        const strictCleanedContent = contentStr
+          .replace(/[\x00-\x1F\x7F-\x9F]/g, ' ');
+          
+        try {
+          contentData = JSON.parse(strictCleanedContent);
+          console.log(`[DEBUG] 厳格クリーニング後のコンテンツをJSONとして解析成功`);
+        } catch (strictError) {
+          // すべての方法が失敗した場合は、テキストそのものをコンテンツとして使用
+          console.log("[DEBUG] すべてのJSON解析方法が失敗しました。テキストをそのまま使用します。", initialError);
+          contentData = { content: contentStr };
+        }
+      }
     }
     
     // Update the section with the content

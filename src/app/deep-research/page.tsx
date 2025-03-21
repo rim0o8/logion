@@ -1,10 +1,11 @@
 "use client";
 
+import type { ResearchParams } from "@/components/deep-research";
 import {
-    ErrorDisplay,
-    ProgressIndicator,
-    ResearchForm,
-    ResearchReport
+  ErrorDisplay,
+  ProgressIndicator,
+  ResearchForm,
+  ResearchReport
 } from "@/components/deep-research";
 import { useEffect, useRef, useState } from "react";
 
@@ -25,9 +26,9 @@ export default function DeepResearchPage() {
     };
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, params: ResearchParams) => {
     e.preventDefault();
-    if (!topic.trim()) return;
+    if (!params.topic.trim()) return;
 
     setLoading(true);
     setError("");
@@ -41,7 +42,7 @@ export default function DeepResearchPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ topic }),
+        body: JSON.stringify(params),
       });
 
       if (!response.ok || !response.body) {
@@ -68,7 +69,7 @@ export default function DeepResearchPage() {
           const chunk = new TextDecoder().decode(value);
           receivedData += chunk;
           
-          console.log("受信データチャンク:", chunk.substring(0, 100) + "...");
+          console.log("受信データチャンク:", `${chunk.substring(0, 100)}...`);
 
           // 改行で区切られたJSONオブジェクトを処理
           const lines = receivedData.split('\n');
@@ -88,7 +89,7 @@ export default function DeepResearchPage() {
                   addProgressStep(data.message);
                   break;
                 case 'complete':
-                  if (data.report && data.report.trim()) {
+                  if (data.report?.trim()) {
                     setReport(data.report);
                     addProgressStep("レポートの生成が完了しました");
                   } else {
