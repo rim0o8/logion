@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import React from 'react';
+import type { FC } from 'react';
 
 interface ResearchProgressProps {
   progress: number;
@@ -9,7 +9,7 @@ interface ResearchProgressProps {
   onCancel: () => void;
 }
 
-export const ResearchProgress: React.FC<ResearchProgressProps> = ({
+export const ResearchProgress: FC<ResearchProgressProps> = ({
   progress,
   message,
   onCancel,
@@ -17,9 +17,9 @@ export const ResearchProgress: React.FC<ResearchProgressProps> = ({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>リサーチ進行中</CardTitle>
+        <CardTitle>Research in Progress</CardTitle>
         <CardDescription>
-          AIがリサーチを実行しています。しばらくお待ちください。
+          AI is conducting research. Please wait a moment.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -36,7 +36,7 @@ export const ResearchProgress: React.FC<ResearchProgressProps> = ({
             variant="outline"
             onClick={onCancel}
           >
-            キャンセル
+            Cancel
           </Button>
         </div>
       </CardContent>

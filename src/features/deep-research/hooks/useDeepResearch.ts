@@ -1,5 +1,5 @@
-import { useCallback, useState } from 'react';
-import { ResearchParams } from '../utils/api';
+import { useCallback, useRef, useState } from 'react';
+import type { ResearchParams } from '../utils/api';
 import { DeepResearchEngine } from '../utils/research-engine';
 
 interface ResearchState {
@@ -18,6 +18,9 @@ export const useDeepResearch = () => {
     result: null,
     error: null,
   });
+  
+  // Use ref to track last progress to prevent it from decreasing
+  const lastProgressRef = useRef(0);
 
   const startResearch = useCallback(async (params: ResearchParams) => {
     // リサーチ開始前に状態をリセット
@@ -28,15 +31,24 @@ export const useDeepResearch = () => {
       result: null,
       error: null,
     });
+    
+    // Reset progress tracker
+    lastProgressRef.current = 0;
 
     try {
       // 進捗状況を更新するためのコールバック
       const onProgress = (message: string, progress: number) => {
-        setState(prev => ({
-          ...prev,
-          progress,
-          progressMessage: message,
-        }));
+        // Ensure progress never goes backwards (unless explicitly reset to 0)
+        if (progress === 0 || progress >= lastProgressRef.current) {
+          lastProgressRef.current = progress;
+          setState(prev => ({
+            ...prev,
+            progress,
+            progressMessage: message,
+          }));
+        } else {
+          console.warn('Ignoring decreasing progress value:', progress, 'current:', lastProgressRef.current);
+        }
       };
 
       // DeepResearchEngineのインスタンスを作成して実行
@@ -78,6 +90,9 @@ export const useDeepResearch = () => {
       result: null,
       error: null,
     });
+    
+    // Reset progress tracker
+    lastProgressRef.current = 0;
   }, []);
 
   return {

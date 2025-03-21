@@ -1,70 +1,70 @@
 import FirecrawlApp from '@mendable/firecrawl-js';
-import type { SearchResult, WebContent } from '../types';
+import type { SearchResult } from '../types';
 
-// Firecrawlクライアントの設定
-export function setupFirecrawl(apiKey?: string) {
-  // APIキーが指定されていない場合は環境変数から取得
-  const key = apiKey || process.env.FIRECRAWL_API_KEY || '';
-  
-  console.log('Firecrawl APIキーを使用:', key ? 'キーが存在します' : 'キーが存在しません');
-  
-  if (!key) {
-    throw new Error('Firecrawl APIキーがサーバー環境に設定されていません。サーバー管理者に連絡してください。');
-  }
-
-  return new FirecrawlApp({ apiKey: key });
-}
-
-// 検索結果のアイテム型
-interface SearchResponseItem {
-  title?: string;
-  url?: string;
-  snippet?: string;
+/**
+ * Firecrawlクライアントのセットアップ
+ * @param apiKey Firecrawl API Key
+ * @returns セットアップされたFirecrawlクライアント
+ */
+export function setupFirecrawl(apiKey: string): FirecrawlApp {
+  console.log('Using Firecrawl API key:', apiKey ? 'Key exists' : 'No key provided');
+  return new FirecrawlApp({ apiKey });
 }
 
 interface SearchResponse {
-  results?: SearchResponseItem[];
-  [key: string]: unknown;
+  results: Array<{
+    url: string;
+    title: string;
+    snippet: string;
+  }>;
 }
 
-// Web検索の実行
-export async function searchWeb(firecrawl: FirecrawlApp, query: string): Promise<SearchResult[]> {
+/**
+ * Web検索を実行する
+ * @param client Firecrawlクライアント
+ * @param query 検索クエリ
+ * @returns 検索結果の配列
+ */
+export async function searchWeb(client: FirecrawlApp, query: string): Promise<SearchResult[]> {
   try {
-    const response = await firecrawl.search(query) as unknown as SearchResponse;
+    const response = await client.search(query) as unknown as SearchResponse;
     const results = response.results || [];
     
     return results.map((result) => ({
-      title: result.title || '',
       url: result.url || '',
-      snippet: result.snippet || '',
+      title: result.title || '',
+      snippet: result.snippet || ''
     }));
   } catch (error) {
-    console.error('検索エラー:', error);
-    return [];
+    console.error('Search error:', error);
+    throw error;
   }
 }
 
-// Webページのコンテンツ型
-interface RawWebContent {
+interface WebContentResponse {
   title?: string;
   text?: string;
-  [key: string]: unknown;
 }
 
-// Webページのコンテンツ取得
-export async function fetchWebContent(firecrawl: FirecrawlApp, url: string): Promise<WebContent | null> {
+/**
+ * WebページのコンテンツをFetch
+ * @param client Firecrawlクライアント
+ * @param url ページURL
+ * @returns タイトルとテキストコンテンツ
+ */
+export async function fetchWebContent(client: FirecrawlApp, url: string): Promise<{ title: string, text: string } | null> {
   try {
-    // firecrawlの正しいメソッド名に修正
-    const content = await firecrawl.scrapeUrl(url) as unknown as RawWebContent;
-    if (!content || !content.text) {
+    const result = await client.scrapeUrl(url) as unknown as WebContentResponse;
+    if (!result || !result.text) {
+      console.log(`No content retrieved for URL: ${url}`);
       return null;
     }
     return {
-      title: content.title || '',
-      text: content.text,
+      title: result.title || '',
+      text: result.text
     };
   } catch (error) {
-    console.error('コンテンツ取得エラー:', error);
-    return null;
+    console.error(`Error fetching content from ${url}:`, error);
+    throw error;
   }
 } 

@@ -36,7 +36,10 @@ export default function DeepResearchPage() {
       </p>
 
       {!isResearching && !result && !error && (
-        <DeepResearchForm onSubmit={handleSubmit} isResearching={isResearching} />
+        <DeepResearchForm 
+          onSubmit={handleSubmit} 
+          formState={{ isResearching }} 
+        />
       )}
 
       {isResearching && (

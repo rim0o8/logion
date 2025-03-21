@@ -1,3 +1,4 @@
+import { Config } from '@/utils/config';
 import FirecrawlApp from '@mendable/firecrawl-js';
 import * as z from 'zod';
 
@@ -28,17 +29,9 @@ export const ResearchParamsSchema = z.object({
 export type ResearchParams = z.infer<typeof ResearchParamsSchema>;
 
 // Firecrawlクライアントの設定
-export function setupFirecrawl(apiKey?: string) {
+export function setupFirecrawl() {
   // APIキーが指定されていない場合は環境変数から取得
-  const key = apiKey || process.env.FIRECRAWL_API_KEY || '';
-  
-  console.log('Firecrawl APIキーを使用:', key ? 'キーが存在します' : 'キーが存在しません');
-  
-  if (!key) {
-    throw new Error('Firecrawl APIキーがサーバー環境に設定されていません。サーバー管理者に連絡してください。');
-  }
-
-  return new FirecrawlApp({ apiKey: key });
+  return new FirecrawlApp({ apiKey: Config.FIRECRAWL_API_KEY });
 }
 
 // 検索結果のアイテム型

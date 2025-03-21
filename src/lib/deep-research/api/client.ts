@@ -1,12 +1,12 @@
 import type { ClientResearchParams, ResearchErrorResponse, ResearchResponse } from '../types';
 
-// ディープリサーチAPIのエンドポイント
+// Deep research API endpoint
 const API_URL = '/api/deep-research';
 
 /**
- * サーバーにディープリサーチを依頼する（従来の方法）
- * @param params リサーチのパラメータ
- * @returns リサーチ結果
+ * Request deep research from the server (traditional method)
+ * @param params Research parameters
+ * @returns Research response
  */
 export async function requestDeepResearch(params: ClientResearchParams): Promise<ResearchResponse> {
   try {
@@ -20,33 +20,36 @@ export async function requestDeepResearch(params: ClientResearchParams): Promise
 
     if (!response.ok) {
       const errorData = await response.json() as ResearchErrorResponse;
-      throw new Error(errorData.message || 'リサーチリクエストに失敗しました');
+      throw new Error(errorData.message || 'Failed to request research');
     }
 
     const data = await response.json() as ResearchResponse;
     return data;
   } catch (error) {
-    console.error('ディープリサーチAPIエラー:', error);
+    console.error('Deep research API error:', error);
     if (error instanceof Error) {
       throw error;
     }
-    throw new Error('予期しないエラーが発生しました');
+    throw new Error('An unexpected error occurred');
   }
 }
 
 /**
- * Server-Sent Eventsを使用してリアルタイムでリサーチを実行する
- * @param params リサーチのパラメータ
- * @param onProgress 進捗状況を受け取るコールバック
- * @returns レポート結果のPromise
+ * Execute deep research with real-time updates using Server-Sent Events
+ * @param params Research parameters
+ * @param onProgress Callback to receive progress updates
+ * @returns Promise that resolves to the report
  */
 export function executeDeepResearchWithSSE(
   params: ClientResearchParams,
   onProgress: (message: string, progress: number) => void
 ): Promise<string> {
+  // Track last progress value to prevent going backwards
+  let lastProgress = 0;
+  
   return new Promise((resolve, reject) => {
     try {
-      // POSTリクエストの開始
+      // Start POST request
       fetch(`${API_URL}?sse=true`, {
         method: 'POST',
         headers: {
@@ -56,36 +59,39 @@ export function executeDeepResearchWithSSE(
         body: JSON.stringify(params),
       }).then(response => {
         if (!response.ok) {
-          throw new Error(`サーバーエラー: ${response.status} ${response.statusText}`);
+          throw new Error(`Server error: ${response.status} ${response.statusText}`);
         }
         if (!response.body) {
-          throw new Error('レスポンスボディがありません');
+          throw new Error('Response body is missing');
         }
 
-        // ReadableStreamのリーダーを取得
+        // Get reader for the ReadableStream
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
 
-        // ストリームからデータを読み込む関数
+        // Initial progress indication
+        onProgress('リサーチを開始しています...', 0);
+
+        // Function to read data from the stream
         function readStream() {
           reader.read().then(({ done, value }) => {
             if (done) {
-              console.log('ストリーム終了');
+              console.log('Stream ended');
               return;
             }
 
-            // バッファにデータを追加して処理
+            // Add data to buffer and process
             buffer += decoder.decode(value, { stream: true });
             
-            // イベントを処理
+            // Process events
             const eventDelimiter = '\n\n';
             const events = buffer.split(eventDelimiter);
             
-            // 最後の不完全なイベントをバッファに残す
+            // Keep the last incomplete event in buffer
             buffer = events.pop() || '';
             
-            // 各イベントを処理
+            // Process each event
             for (const eventData of events) {
               if (!eventData.trim()) continue;
               
@@ -101,66 +107,83 @@ export function executeDeepResearchWithSSE(
                 }
               }
               
-              // イベントタイプに応じた処理
+              // Handle event based on type
               try {
                 const parsedData = JSON.parse(data);
                 
                 if (eventType === 'progress') {
-                  onProgress(parsedData.message, parsedData.progress);
+                  // Ensure progress never decreases
+                  const newProgress = Math.max(parsedData.progress, lastProgress);
+                  
+                  // If progress value is too low compared to the last value and not 0 (which could be a valid reset),
+                  // ignore it unless it's the initial progress
+                  if (parsedData.progress > 0 && parsedData.progress < lastProgress * 0.5) {
+                    console.warn('Ignoring suspicious progress decrease:', parsedData.progress, 'last was:', lastProgress);
+                  } else {
+                    lastProgress = newProgress;
+                    onProgress(parsedData.message, newProgress);
+                  }
                 } else if (eventType === 'result') {
+                  // Ensure we show 100% before resolving
+                  if (lastProgress < 100) {
+                    onProgress('リサーチが完了しました', 100);
+                  }
                   resolve(parsedData.report);
                   reader.cancel();
                   return;
                 } else if (eventType === 'error') {
-                  reject(new Error(parsedData.message || '研究プロセスでエラーが発生しました'));
+                  reject(new Error(parsedData.message || 'An error occurred during the research process'));
                   reader.cancel();
                   return;
                 }
               } catch (error) {
-                console.error('イベントデータの解析エラー:', error);
+                console.error('Error parsing event data:', error);
               }
             }
             
-            // 次のデータを読み込む
+            // Read next data
             readStream();
           }).catch(error => {
+            console.error('Stream reading error:', error);
+            // Don't reset progress on error
             reject(error);
           });
         }
         
-        // ストリーム読み込みを開始
+        // Start reading the stream
         readStream();
       }).catch(error => {
-        console.error('ディープリサーチリクエストエラー:', error);
+        console.error('Deep research request error:', error);
         reject(error);
       });
     } catch (error) {
+      console.error('SSE setup error:', error);
       reject(error);
     }
   });
 }
 
 /**
- * ディープリサーチを実行するためのフック用ユーティリティ
- * @param params リサーチのパラメータ
- * @param onProgress 進捗状況を受け取るコールバック
- * @returns レポート結果
+ * Utility for hook to execute deep research
+ * @param params Research parameters
+ * @param onProgress Callback to receive progress updates
+ * @returns Research report
  */
 export async function executeDeepResearch(
   params: ClientResearchParams,
   onProgress?: (message: string, progress: number) => void
 ): Promise<string> {
   try {
-    // 進捗コールバックが提供されている場合はSSEを使用
+    // Use SSE if progress callback is provided
     if (onProgress) {
       return await executeDeepResearchWithSSE(params, onProgress);
     }
     
-    // 進捗コールバックがない場合は従来の方法を使用
+    // Use traditional method if no progress callback
     const result = await requestDeepResearch(params);
     return result.report;
   } catch (error) {
-    console.error('ディープリサーチの実行エラー:', error);
+    console.error('Deep research execution error:', error);
     throw error;
   }
 } 

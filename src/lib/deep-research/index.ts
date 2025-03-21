@@ -1,11 +1,11 @@
-// 型定義
+// Type definitions
 export * from './types';
 
-// APIクライアント
+// API client
 export * from './api/client';
 
-// フック
+// Hooks (frontend)
 export * from './hooks/useDeepResearch';
 
-// エンジン (サーバーサイドのみで使用)
+// Engine (server-side only)
 export { DeepResearchEngine } from './engine/research-engine';

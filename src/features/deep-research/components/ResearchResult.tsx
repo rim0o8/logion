@@ -6,12 +6,13 @@ import ReactMarkdown from 'react-markdown';
 
 export interface ResearchResultProps {
   result: string;
+  onNewSearch: () => void;
 }
 
-export const ResearchResult = ({ result }: ResearchResultProps) => {
-  // ダウンロード機能
+export const ResearchResult = ({ result, onNewSearch }: ResearchResultProps) => {
+  // Download functionality
   const handleDownload = () => {
-    // レポートをMarkdownファイルとして保存
+    // Save report as a Markdown file
     const blob = new Blob([result], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -26,10 +27,15 @@ export const ResearchResult = ({ result }: ResearchResultProps) => {
   return (
     <Card className="mt-8">
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>リサーチ結果</CardTitle>
-        <Button onClick={handleDownload} variant="outline" size="sm">
-          レポートをダウンロード
-        </Button>
+        <CardTitle>Research Results</CardTitle>
+        <div className="space-x-2">
+          <Button onClick={handleDownload} variant="outline" size="sm">
+            Download Report
+          </Button>
+          <Button onClick={onNewSearch} variant="outline" size="sm">
+            New Search
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="prose prose-sm md:prose-base max-w-none">
         <ReactMarkdown>{result}</ReactMarkdown>

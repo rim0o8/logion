@@ -3,12 +3,12 @@ import { ResearchParamsSchema } from '@/lib/deep-research/types';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
-// サーバーサイドだけでAPIキーにアクセスするようにする
+// Access API keys only on server side
 export const runtime = 'nodejs';
 export const preferredRegion = 'auto';
 export const dynamic = 'force-dynamic';
 
-// Server-Sent Eventsのエンコーダー
+// Server-Sent Events encoder
 function encodeSSE(data: unknown, event?: string) {
   const eventField = event ? `event: ${event}\n` : '';
   const jsonData = JSON.stringify(data);
@@ -20,35 +20,9 @@ export async function POST(request: NextRequest) {
   const sse = searchParams.get('sse') === 'true';
 
   try {
-    // 環境変数のデバッグ出力
-    console.log('API環境変数のデバッグ:');
-    console.log(`OPENAI_API_KEY: ${process.env.OPENAI_API_KEY?.substring(0, 5)}...`);
-    console.log(`ANTHROPIC_API_KEY: ${process.env.ANTHROPIC_API_KEY?.substring(0, 5)}...`);
-    console.log(`FIRECRAWL_API_KEY: ${process.env.FIRECRAWL_API_KEY?.substring(0, 5)}...`);
     
-    // 環境変数チェック
-    if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json(
-        { error: 'Server configuration error', message: 'OpenAI APIキーがサーバーに設定されていません' },
-        { status: 500 }
-      );
-    }
     
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json(
-        { error: 'Server configuration error', message: 'Anthropic APIキーがサーバーに設定されていません' },
-        { status: 500 }
-      );
-    }
-    
-    if (!process.env.FIRECRAWL_API_KEY) {
-      return NextResponse.json(
-        { error: 'Server configuration error', message: 'Firecrawl APIキーがサーバーに設定されていません' },
-        { status: 500 }
-      );
-    }
-    
-    // リクエストボディの取得と検証
+    // Get and validate request body
     const body = await request.json();
     const result = ResearchParamsSchema.safeParse(body);
 
@@ -59,24 +33,57 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 環境変数からAPIキーを設定
+    // Set API keys from environment variables
     const params = result.data;
-    params.openaiApiKey = process.env.OPENAI_API_KEY;
-    params.anthropicApiKey = process.env.ANTHROPIC_API_KEY;
-    params.firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
     
-    console.log('APIキーを環境変数から設定:');
-    console.log(`OpenAI APIキー: ${params.openaiApiKey ? '成功' : '失敗'}`);
-    console.log(`Anthropic APIキー: ${params.anthropicApiKey ? '成功' : '失敗'}`);
-    console.log(`Firecrawl APIキー: ${params.firecrawlApiKey ? '成功' : '失敗'}`);
+    // Check if using OpenAI models
+    if (params.model.includes('gpt')) {
+      params.openaiApiKey = process.env.OPENAI_API_KEY;
+      if (!params.openaiApiKey) {
+        return NextResponse.json(
+          { error: 'API key error', message: 'OpenAI API key is not set in server environment' },
+          { status: 500 }
+        );
+      }
+    }
+    
+    // Check if using Anthropic models
+    if (params.model.includes('claude')) {
+      params.anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+      if (!params.anthropicApiKey) {
+        return NextResponse.json(
+          { error: 'API key error', message: 'Anthropic API key is not set in server environment' },
+          { status: 500 }
+        );
+      }
+    }
+    
+    // Set search provider API key
+    if (params.searchProvider === 'firecrawl' || !params.searchProvider) {
+      params.firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
+      if (!params.firecrawlApiKey) {
+        return NextResponse.json(
+          { error: 'API key error', message: 'Firecrawl API key is not set in server environment' },
+          { status: 500 }
+        );
+      }
+    } else if (params.searchProvider === 'tavily') {
+      params.tavilyApiKey = process.env.TAVILY_API_KEY;
+      if (!params.tavilyApiKey) {
+        return NextResponse.json(
+          { error: 'API key error', message: 'Tavily API key is not set in server environment' },
+          { status: 500 }
+        );
+      }
+    }
 
-    // SSEモードの場合、ストリーミングレスポンスを設定
+    // For SSE mode, set up streaming response
     if (sse) {
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
         async start(controller) {
           try {
-            // 進捗状況を追跡するためのコールバック
+            // Callback to track progress
             const progressCallback = (message: string, progress: number) => {
               controller.enqueue(
                 encoder.encode(
@@ -84,24 +91,22 @@ export async function POST(request: NextRequest) {
                 )
               );
             };
-            
-            // DeepResearchEngineのインスタンス化と実行
-            const researchEngine = new DeepResearchEngine(params, progressCallback);
 
-            // リサーチの実行
+            // Initialize and run DeepResearchEngine
+            const researchEngine = new DeepResearchEngine(params, progressCallback);
             const report = await researchEngine.run();
 
-            // 結果を送信
+            // Send result
             controller.enqueue(
               encoder.encode(
                 encodeSSE({ report, success: true }, 'result')
               )
             );
-            
-            // ストリームを終了
+
+            // Close stream
             controller.close();
           } catch (error) {
-            // エラーメッセージを送信
+            // Send error message
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             controller.enqueue(
               encoder.encode(
@@ -113,7 +118,7 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // SSEヘッダーとストリームを返す
+      // Return SSE headers and stream
       return new Response(stream, {
         headers: {
           'Content-Type': 'text/event-stream',
@@ -123,28 +128,28 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 従来の非ストリーミングモード
-    // 進捗状況を追跡するための配列
+    // Traditional non-streaming mode
+    // Array to track progress
     const progressMessages: { message: string; progress: number }[] = [];
     
-    // DeepResearchEngineのインスタンス化と実行
+    // Initialize and run DeepResearchEngine
     const researchEngine = new DeepResearchEngine(params, (message, progress) => {
       progressMessages.push({ message, progress });
     });
 
-    // リサーチの実行
+    // Run research
     const report = await researchEngine.run();
 
-    // 結果を返す
+    // Return result
     return NextResponse.json({
       success: true,
       report,
       progressLog: progressMessages
     });
   } catch (error) {
-    console.error('Deep Research APIエラー:', error);
+    console.error('Deep Research API error:', error);
     
-    // エラーレスポンス
+    // Error response
     return NextResponse.json(
       { 
         error: 'Research process failed', 

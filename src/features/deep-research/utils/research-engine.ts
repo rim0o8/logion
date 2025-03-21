@@ -6,13 +6,13 @@ import { ChatOpenAI } from "@langchain/openai";
 import type FirecrawlApp from '@mendable/firecrawl-js';
 import pLimit from 'p-limit';
 import type {
-    ResearchParams,
-    SearchResult
+  ResearchParams,
+  SearchResult
 } from './api';
 import {
-    fetchWebContent,
-    searchWeb,
-    setupFirecrawl,
+  fetchWebContent,
+  searchWeb,
+  setupFirecrawl,
 } from './api';
 
 // コンテンツ分析結果の型定義
@@ -68,7 +68,7 @@ export class DeepResearchEngine {
     if (!firecrawlApiKey) {
       throw new Error('Firecrawl APIキーがサーバー環境に設定されていません。サーバー管理者に連絡してください。');
     }
-    this.firecrawl = setupFirecrawl(firecrawlApiKey);
+    this.firecrawl = setupFirecrawl();
     
     this.query = params.query;
     this.depth = params.depth;

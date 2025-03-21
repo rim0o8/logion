@@ -46,6 +46,8 @@ interface ConfigType {
     NEXT_PUBLIC_ADMOB_BANNER_ID: string;
     NODE_ENV: string;
     SLACK_WEBHOOK_URL: string;
+    FIRECRAWL_API_KEY: string;
+    TAVILY_API_KEY: string;
 }
 
 const config: ConfigType = {
@@ -73,6 +75,8 @@ const config: ConfigType = {
     NEXT_PUBLIC_ADMOB_BANNER_ID: CheckEnv('NEXT_PUBLIC_ADMOB_BANNER_ID', process.env.NEXT_PUBLIC_ADMOB_BANNER_ID),
     NODE_ENV: CheckEnv('NODE_ENV', process.env.NODE_ENV),
     SLACK_WEBHOOK_URL: GetEnv('SLACK_WEBHOOK_URL', true),
+    FIRECRAWL_API_KEY: GetEnv('FIRECRAWL_API_KEY', true),
+    TAVILY_API_KEY: GetEnv('TAVILY_API_KEY', true),
 };
 
 export const Config = ((): ConfigType => {
