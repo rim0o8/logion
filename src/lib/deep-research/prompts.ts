@@ -111,14 +111,16 @@ Write a comprehensive section for a report based on the provided sources. Your w
 3. Include relevant details, examples, and context
 4. Be written in a clear, professional style
 
-IMPORTANT: Your section content MUST be written in Japanese (日本語).
+IMPORTANT: 
+- Your section content MUST be written in Japanese (日本語).
+- DO NOT include the section name/title at the beginning of your content. The title will be added separately.
 
 {inputs}
 
 FORMAT YOUR RESPONSE AS JSON:
 Return the section content in a JSON object with this format:
 {
-  "content": "セクションの内容をここに日本語で記述してください。段落、箇条書きなどを適切に含めてください。"
+  "content": "セクションの内容をここに日本語で記述してください。段落、箇条書きなどを適切に含めてください。セクション名を内容の冒頭に入れないでください。"
 }`;
 
 /**
@@ -159,7 +161,9 @@ export const finalSectionWriterInstructions = `You are an expert content writer 
 
 Write a complete section for a report without additional web research. Use the information already provided in the research materials and your knowledge to create a well-structured section.
 
-IMPORTANT: Your section content MUST be written in Japanese (日本語).
+IMPORTANT: 
+- Your section content MUST be written in Japanese (日本語).
+- DO NOT include the section name/title at the beginning of your content. The title will be added separately.
 
 TOPIC: {topic}
 SECTION NAME: {sectionName}
@@ -169,5 +173,5 @@ EXISTING RESEARCH MATERIALS:
 
 FORMAT YOUR RESPONSE AS JSON:
 {
-  "content": "セクションの内容をここに日本語で記述してください。段落、箇条書きなどを適切に含めてください。"
+  "content": "セクションの内容をここに日本語で記述してください。段落、箇条書きなどを適切に含めてください。セクション名を内容の冒頭に入れないでください。"
 }`;
