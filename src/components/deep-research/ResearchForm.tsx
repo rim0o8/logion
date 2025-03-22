@@ -23,10 +23,10 @@ interface ResearchFormProps {
 
 export function ResearchForm({ topic, setTopic, handleSubmit, loading }: ResearchFormProps) {
   // フォームの状態を管理
-  const [writerModel, setWriterModel] = useState("claude-3-5-sonnet-latest");
-  const [plannerModel, setPlannerModel] = useState("claude-3-7-sonnet-latest");
-  const [maxSearchDepth, setMaxSearchDepth] = useState(2);
-  const [numberOfQueries, setNumberOfQueries] = useState(3);
+  const [writerModel, setWriterModel] = useState("claude-3-haiku-20240307");
+  const [plannerModel, setPlannerModel] = useState("claude-3-haiku-20240307");
+  const [maxSearchDepth, setMaxSearchDepth] = useState(1);
+  const [numberOfQueries, setNumberOfQueries] = useState(1);
   
   // 利用可能なモデルのリスト
   const availableModels = [

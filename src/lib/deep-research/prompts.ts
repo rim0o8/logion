@@ -50,12 +50,16 @@ Think carefully about what specific information is needed for this section. Your
 3. Include important context
 
 FORMAT YOUR RESPONSE AS JSON:
-Return only a JSON array of search queries without any additional text.
-[
-  {"searchQuery": "first search query"},
-  {"searchQuery": "second search query"},
-  ...
-]`;
+Return only a JSON object with a 'queries' array without any additional text. Each query object must use the field name 'search_query' (NOT 'searchQuery' or other variations).
+
+Example format:
+{
+  "queries": [
+    {"search_query": "first search query"},
+    {"search_query": "second search query"},
+    ...
+  ]
+}`;
 
 /**
  * レポートプランナー用のクエリライター指示テンプレート
@@ -72,12 +76,16 @@ Think carefully about what specific information would help create a well-structu
 3. Use precise terminology
 
 FORMAT YOUR RESPONSE AS JSON:
-Return only a JSON array of search queries without any additional text.
-[
-  {"searchQuery": "first search query"},
-  {"searchQuery": "second search query"},
-  ...
-]`;
+Return only a JSON object with a 'queries' array without any additional text. Each query object must use the field name 'search_query' (NOT 'searchQuery' or other variations).
+
+Example format:
+{
+  "queries": [
+    {"search_query": "first search query"},
+    {"search_query": "second search query"},
+    ...
+  ]
+}`;
 
 /**
  * セクションライターの入力形式

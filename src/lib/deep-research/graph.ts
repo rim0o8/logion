@@ -11,11 +11,9 @@ import {
   queryWriterInstructions,
   reportPlannerInstructions,
   reportPlannerQueryWriterInstructions,
-  sectionGraderInstructions,
   sectionWriterInstructions
 } from "./prompts";
 import type {
-  Feedback,
   ReportState,
   SearchQuery,
   Section,
@@ -120,22 +118,33 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
   
   console.log("[DEBUG] 生成されたクエリレスポンス:", queriesText);
   
-  let queries = [];
+  let queries: unknown[] = [];
   try {
     // safeJsonParseを使用してJSONを解析
-    const queriesData = safeJsonParse<Record<string, unknown> | unknown[]>(queriesText, { queries: [] });
+    const queriesData = safeJsonParse<Record<string, unknown> | unknown[]>(queriesText);
     
-    if (queriesData.queries && Array.isArray(queriesData.queries)) {
-      queries = queriesData.queries;
-    } else if (Array.isArray(queriesData) && queriesData.length > 0) {
+    // JSONの解析に失敗した場合は空の配列を使用
+    if (queriesData === null) {
+      console.log("[WARNING] クエリデータの解析に失敗しました。空の配列を使用します。");
+      return [];
+    }
+    
+    if (Array.isArray(queriesData)) {
       // 配列として直接返された場合
       queries = queriesData;
-    } else {
-      // オブジェクトの中のいずれかのプロパティにクエリが含まれている可能性を確認
-      for (const key in queriesData) {
-        if (Array.isArray(queriesData[key]) && queriesData[key].length > 0) {
-          queries = queriesData[key];
-          break;
+    } else if (typeof queriesData === 'object' && queriesData !== null) {
+      // オブジェクト内のqueriesプロパティを探す
+      const recordData = queriesData as Record<string, unknown>;
+      if (Array.isArray(recordData.queries)) {
+        queries = recordData.queries;
+      } else {
+        // オブジェクトの中のいずれかのプロパティにクエリが含まれている可能性を確認
+        for (const key in recordData) {
+          const value = recordData[key];
+          if (Array.isArray(value) && value.length > 0) {
+            queries = value;
+            break;
+          }
         }
       }
     }
@@ -238,33 +247,33 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
     : JSON.stringify(sectionsResult.content);
   
   console.log(`[DEBUG] セクション生成結果長: ${contentStr.length}文字`);
-  console.log(`[DEBUG] セクション生成結果内容: ${contentStr.substring(0, 500)}...`);
   
   try {
     // コンテンツをJSONとして解析する - safeJsonParseを使用
-    const contentData = safeJsonParse<Record<string, unknown>>(contentStr, { sections: [] });
+    const contentData = safeJsonParse<Record<string, unknown> | unknown[]>(contentStr);
+    console.log("[DEBUG] セクション生成結果データ:", contentData);
     
-    // Check if we have a valid sections array
-    let sections = [];
-    
-    if (contentData.sections && Array.isArray(contentData.sections)) {
-      sections = contentData.sections;
-    } else {
-      // Check if any field contains the sections array
-      for (const key in contentData) {
-        if (Array.isArray(contentData[key]) && contentData[key].length > 0) {
-          // このフィールドがセクションの配列である可能性がある
-          if (contentData[key][0].name || contentData[key][0].title) {
-            sections = contentData[key];
-            break;
-          }
+    // JSONの解析に失敗した場合
+    if (contentData === null) {
+      console.log("[WARNING] コンテンツデータの解析に失敗しました。プレーンテキストを解析します。");
+      // プレーンテキストをMarkdownのセクションとして解釈
+      try {
+        const extractedSections = extractSectionsFromText(contentStr, topic);
+        if (extractedSections.length > 0) {
+          console.log(`[DEBUG] プレーンテキストから${extractedSections.length}個のセクションを抽出しました`);
+          return {
+            ...state,
+            sections: extractedSections
+          };
         }
+      } catch (e) {
+        console.log("[DEBUG] プレーンテキスト解析も失敗:", e);
       }
       
-      // それでもセクションが見つからない場合、コンテンツ全体を1つのセクションとして扱う
-      if (sections.length === 0) {
-        console.log("[DEBUG] セクションが見つからないため、デフォルトセクションを作成します");
-        sections = [
+      // 解析に失敗した場合はデフォルトのセクションを使用
+      return {
+        ...state,
+        sections: [
           {
             name: "概要",
             description: `${topic}の概要`,
@@ -286,33 +295,122 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
             research: true,
             content: ""
           }
-        ];
+        ]
+      };
+    }
+    
+    // Check if we have a valid sections array
+    let sectionsArray: unknown[] = [];
+    
+    // 配列が直接返された場合
+    if (Array.isArray(contentData)) {
+      console.log("[DEBUG] コンテンツデータは直接配列です。セクションとして使用します。");
+      sectionsArray = contentData;
+    } 
+    // オブジェクトの場合、sections配列を探す
+    else if (typeof contentData === 'object' && contentData !== null) {
+      const objData = contentData as Record<string, unknown>;
+      // sectionsプロパティがある場合
+      if (objData.sections && Array.isArray(objData.sections)) {
+        sectionsArray = objData.sections;
+      } else {
+        // 他のプロパティで配列を探す
+        for (const key in objData) {
+          const value = objData[key];
+          if (Array.isArray(value) && value.length > 0) {
+            // このフィールドがセクションの配列である可能性がある
+            const firstItem = value[0] as Record<string, unknown>;
+            if (firstItem && (
+              typeof firstItem.name === 'string' || 
+              typeof firstItem.title === 'string' || 
+              typeof firstItem.description === 'string'
+            )) {
+              sectionsArray = value;
+              break;
+            }
+          }
+        }
       }
     }
     
+    // それでもセクションが見つからない場合、デフォルトセクションを使用
+    if (sectionsArray.length === 0) {
+      console.log("[WARNING] セクションが見つかりませんでした。デフォルトセクションを使用します。");
+      return {
+        ...state,
+        sections: [
+          {
+            name: "概要",
+            description: `${topic}の概要`,
+            plan: "トピックの基本情報を収集し、説明する",
+            research: true,
+            content: ""
+          },
+          {
+            name: "詳細分析",
+            description: `${topic}の詳細な分析`,
+            plan: "トピックに関する詳細情報を収集し、分析する",
+            research: true,
+            content: ""
+          },
+          {
+            name: "結論",
+            description: `${topic}に関する結論`,
+            plan: "分析結果に基づいて結論をまとめる",
+            research: true,
+            content: ""
+          }
+        ]
+      };
+    }
+    
     // セクションの標準化 - 必要なフィールドがない場合はデフォルト値を設定
-    sections = sections.map((section: Record<string, unknown>) => {
+    const normalizedSections = sectionsArray.map((sectionData: unknown) => {
+      // nullやundefinedの場合は空のオブジェクトとして扱う
+      const sectionObj = (typeof sectionData === 'object' && sectionData !== null) 
+        ? sectionData as Record<string, unknown>
+        : {};
+      
       // titleフィールドがある場合はnameにマッピング
-      const name = (section.name as string) || (section.title as string) || "無題のセクション";
-      const description = (section.description as string) || `${name}に関する情報`;
+      const name = (
+        (typeof sectionObj.name === 'string' && sectionObj.name) || 
+        (typeof sectionObj.title === 'string' && sectionObj.title) || 
+        "無題のセクション"
+      );
+      
+      const description = (
+        (typeof sectionObj.description === 'string' && sectionObj.description) || 
+        `${name}に関する情報`
+      );
+      
+      const plan = (
+        (typeof sectionObj.plan === 'string' && sectionObj.plan) || 
+        `${name}に関する情報を収集する`
+      );
+      
+      const research = sectionObj.research !== undefined ? Boolean(sectionObj.research) : true;
+      
+      const content = (typeof sectionObj.content === 'string' && sectionObj.content) || "";
       
       return {
         name,
         description,
-        plan: (section.plan as string) || `${name}に関する情報を収集する`,
-        research: section.research !== undefined ? Boolean(section.research) : true,
-        content: (section.content as string) || ""
+        plan,
+        research,
+        content
       };
     });
     
-    console.log(`[DEBUG] 解析されたセクション数: ${sections.length}`);
-    if (sections.length > 0) {
-      console.log(`[DEBUG] 最初のセクション: ${JSON.stringify(sections[0], null, 2)}`);
+    console.log(`[DEBUG] 解析されたセクション数: ${normalizedSections.length}`);
+    if (normalizedSections.length > 0) {
+      console.log(`[DEBUG] 最初のセクション: ${JSON.stringify(normalizedSections[0], null, 2)}`);
     }
     
     // Return command with sections
-    return { sections };
-    
+    return {
+      ...state, 
+      sections: normalizedSections
+    };
   } catch (error) {
     console.error("[DEBUG] セクション解析エラー:", error);
     // Default sections if parsing fails
@@ -466,7 +564,7 @@ async function generateQueries(state: SectionState, config: RunnableConfig) {
     console.log(`[DEBUG] クエリ生成モデル呼び出し: ${writerModelName}`);
     const queriesResult = await writerModel.invoke([
       new SystemMessage(systemInstructions),
-      new HumanMessage(`Generate ${numberOfQueries} search queries about ${topic}, focusing on the section "${section.name}". Return as JSON with a "queries" array containing objects with "search_query" field.`),
+      new HumanMessage(`Generate ${numberOfQueries} search queries about ${topic}, focusing on the section "${section.name}". Return as JSON with a "queries" array containing objects with "search_query" field. Format must be: {"queries": [{"search_query": "query text"}, ...]}`),
     ]);
 
     // Parse the result to get queries
@@ -479,46 +577,86 @@ async function generateQueries(state: SectionState, config: RunnableConfig) {
     
     try {
       // safeJsonParseを使用してJSONを解析
-      const queriesData = safeJsonParse<Record<string, unknown> | unknown[]>(queriesText, { queries: [] });
+      const queriesData = safeJsonParse<Record<string, unknown> | unknown[]>(queriesText);
       
-      // クエリの配列を見つける
-      let queries = [];
-      if (queriesData.queries && Array.isArray(queriesData.queries)) {
-        queries = queriesData.queries;
-      } else if (Array.isArray(queriesData)) {
-        queries = queriesData;
-      } else {
-        // オブジェクトのプロパティを探す
-        for (const key in queriesData) {
-          if (Array.isArray(queriesData[key])) {
-            queries = queriesData[key];
-            break;
+      // JSONの解析に失敗した場合は空の配列を使用
+      if (queriesData === null) {
+        console.log("[WARNING] クエリデータの解析に失敗しました。デフォルトクエリを使用します。");
+        return { 
+          search_queries: [
+            { search_query: `${topic} ${section.name}` },
+            { search_query: `${section.name} ${section.description}` },
+            { search_query: `${topic} ${section.name} explained` }
+          ] 
+        };
+      }
+      
+      let queryItems: unknown[] = [];
+      
+      if (Array.isArray(queriesData)) {
+        // 配列として直接返された場合
+        console.log("[DEBUG] クエリデータは直接配列です");
+        queryItems = queriesData;
+      } else if (typeof queriesData === 'object' && queriesData !== null) {
+        // オブジェクト内のqueriesプロパティを探す
+        const recordData = queriesData as Record<string, unknown>;
+        if (Array.isArray(recordData.queries)) {
+          console.log("[DEBUG] queriesプロパティから配列を抽出しました");
+          queryItems = recordData.queries;
+        } else {
+          // オブジェクトの中のいずれかのプロパティにクエリが含まれている可能性を確認
+          for (const key in recordData) {
+            const value = recordData[key];
+            if (Array.isArray(value) && value.length > 0) {
+              console.log(`[DEBUG] プロパティ「${key}」から配列を抽出しました`);
+              queryItems = value;
+              break;
+            }
           }
         }
       }
       
-      // 正規化
-      const normalizedQueries = queries.map((q: Record<string, unknown> | string) => {
-        if (typeof q === 'string') {
-          return { search_query: q };
-        }
+      console.log("[DEBUG] 解析されたクエリ項目数:", queryItems.length);
+      
+      // クエリのフィールド名を確認し、正規化
+      if (queryItems.length > 0) {
+        let normalizedQueries: {search_query: string}[] = [];
         
-        // 異なるプロパティ名をチェック
-        for (const field of ['search_query', 'searchQuery', 'query', 'q', 'text']) {
-          if (q[field]) {
-            return { search_query: q[field] as string };
+        // 各アイテムをチェックして適切なクエリオブジェクトに変換
+        for (const item of queryItems) {
+          if (typeof item === 'string') {
+            // 文字列の場合
+            normalizedQueries.push({ search_query: item });
+          } else if (typeof item === 'object' && item !== null) {
+            // オブジェクトの場合、有効なフィールド名を探す
+            const obj = item as Record<string, unknown>;
+            const validFields = ['search_query', 'searchQuery', 'query', 'text', 'q'];
+            
+            let foundQueryField = false;
+            for (const field of validFields) {
+              if (field in obj && typeof obj[field] === 'string') {
+                normalizedQueries.push({ search_query: obj[field] as string });
+                foundQueryField = true;
+                break;
+              }
+            }
+            
+            // フィールドが見つからない場合、オブジェクト自体を文字列化
+            if (!foundQueryField) {
+              normalizedQueries.push({ search_query: JSON.stringify(obj) });
+            }
+          } else if (item !== null && item !== undefined) {
+            // その他の値（数値など）
+            normalizedQueries.push({ search_query: String(item) });
           }
         }
         
-        // プロパティがない場合はオブジェクト自体を使用
-        return { search_query: typeof q === 'object' ? JSON.stringify(q) : String(q) };
-      });
-      
-      console.log(`[DEBUG] 解析されたクエリ数: ${normalizedQueries.length}`);
-      
-      // クエリがあれば返す、なければデフォルトを生成
-      if (normalizedQueries.length > 0) {
-        return { search_queries: normalizedQueries };
+        console.log("[DEBUG] 正規化されたクエリ数:", normalizedQueries.length);
+        
+        // 正規化されたクエリがあれば返す
+        if (normalizedQueries.length > 0) {
+          return { search_queries: normalizedQueries };
+        }
       }
     } catch (error) {
       console.error(`[DEBUG] クエリJSONの解析に失敗: ${error}`);
@@ -636,6 +774,7 @@ async function searchWeb(state: SectionState, config: RunnableConfig) {
  */
 async function writeSection(state: SectionState, config: RunnableConfig) {
   console.log(`[DEBUG] セクション執筆: セクション="${state.section.name}", 検索回数=${state.search_iterations}`);
+  console.log(`[DEBUG] セクション執筆時の既存完了セクション数=${state.completed_sections.length}`);
   
   // Get state
   const topic = state.topic;
@@ -676,12 +815,20 @@ ${sourceText || "No sources provided. Generate content based on general knowledg
   } catch (error) {
     console.error(`[DEBUG] セクション執筆中にエラーが発生: ${error}`);
     // エラー時はデフォルトのメッセージを作成
+    const defaultSection = {
+      ...section,
+      content: `${section.name}に関する情報が見つかりませんでした。`
+    };
+    console.log(`[DEBUG] エラー時のデフォルトセクション生成: 「${defaultSection.name}」, 内容長=${defaultSection.content.length}`);
+    
+    // 既存の完了セクションを維持
+    const updatedCompletedSections = [...state.completed_sections, defaultSection];
+    console.log(`[DEBUG] エラー時の完了セクション数: ${updatedCompletedSections.length}`);
+    
     return new Command({
       update: {
-        section: {
-          ...section,
-          content: `${section.name}に関する情報が見つかりませんでした。`
-        },
+        section: defaultSection,
+        completed_sections: updatedCompletedSections
       },
       goto: END
     });
@@ -696,126 +843,226 @@ ${sourceText || "No sources provided. Generate content based on general knowledg
   console.log(`[DEBUG] セクション「${section.name}」の生成されたコンテンツプレビュー: ${contentStr.substring(0, 200)}...`);
     
   try {
-    // コンテンツをsafeJsonParseで解析
-    const contentData = safeJsonParse<{ content: string }>(contentStr, { content: contentStr });
+    // コンテンツをJSONとして解析する - safeJsonParseを使用
+    const contentData = safeJsonParse<Record<string, unknown> | unknown[]>(contentStr);
+    console.log(`[DEBUG] セクション執筆結果データ:`, contentData);
     
-    // Update the section with the content
-    const updatedSection = {
-      ...section,
-      content: contentData.content || contentStr,
-    };
-    
-    console.log(`[DEBUG] 更新されたセクションコンテンツ長: ${(updatedSection.content as string).length}文字`);
-    console.log(`[DEBUG] 更新されたセクションコンテンツプレビュー: ${(updatedSection.content as string).substring(0, 200)}...`);
-    
-    // Get feedback on the section
-    const feedbackSystemInstructions = sectionGraderInstructions.replace(
-      "{topic}", topic
-    ).replace(
-      "{sectionName}", section.name
-    ).replace(
-      "{sectionDescription}", section.description
-    );
-    
-    console.log(`[DEBUG] セクション評価用システムプロンプト長: ${feedbackSystemInstructions.length}文字`);
-    
-    const evaluatorProvider = getConfigValue(configurable.plannerProvider);
-    const evaluatorModelName = getConfigValue(configurable.plannerModel);
-    const evaluatorModel = initChatModel(evaluatorModelName, evaluatorProvider);
-    
-    console.log(`[DEBUG] セクション評価モデル呼び出し: ${evaluatorModelName}`);
-    
-    const feedbackResult = await evaluatorModel.invoke([
-      new SystemMessage(feedbackSystemInstructions),
-      new HumanMessage(`
-Topic: ${topic}
-Section Name: ${section.name}
-Section Description: ${section.description}
-Content: ${updatedSection.content}
-
-Does this content fulfill the requirements for this section?
-Respond with a JSON object with the following format:
-{
-  "grade": "pass" or "fail",
-  "follow_up_queries": [
-    {"search_query": "query 1"},
-    {"search_query": "query 2"}
-  ]
-}
-`),
-    ]);
-    
-    const feedbackStr = typeof feedbackResult.content === 'string' 
-      ? feedbackResult.content 
-      : JSON.stringify(feedbackResult.content);
-    
-    console.log(`[DEBUG] セクション評価結果長: ${feedbackStr.length}文字`);
-    
-    try {
-      // ここでfeedbackStrからJSONを抽出（最初の { から最後の } までを探す）
-      const jsonMatch = feedbackStr.match(/\{[\s\S]*\}/);
-      const jsonStr = jsonMatch ? jsonMatch[0] : feedbackStr;
+    // JSONの解析に失敗した場合
+    if (contentData === null) {
+      console.log(`[DEBUG] セクション執筆結果の解析に失敗しました。元のコンテンツを使用します。`);
       
-      // 抽出したJSONを解析
-      const feedback = safeJsonParse<Feedback>(jsonStr, { grade: "fail", follow_up_queries: [] });
-      console.log(`[DEBUG] セクション評価: grade=${feedback.grade}, フォローアップクエリ数=${feedback.follow_up_queries?.length || 0}`);
+      const updatedSection = {
+        ...section,
+        content: contentStr
+      };
       
-      // 進捗状況を通知
-      const progressCallback = config.configurable?.progressCallback as ((message: string) => Promise<void>) | undefined;
+      // 既存の完了セクションを維持
+      const updatedCompletedSections = [...state.completed_sections, updatedSection];
+      console.log(`[DEBUG] JSON解析失敗時の完了セクション数: ${updatedCompletedSections.length}`);
       
-      // If the section is passing or the max search depth is reached, publish the section
-      if (feedback.grade === "pass" || state.search_iterations >= configurable.maxSearchDepth) {
-        console.log("[DEBUG] セクション合格または最大検索深度到達: 完了へ遷移");
-        console.log(`[DEBUG] 完了セクションに追加: "${updatedSection.name}", 内容長=${Object.keys(updatedSection.content).length}`);
-        // 進捗状況を通知
-        if (progressCallback) {
-          await progressCallback(`セクション「${section.name}」は合格しました`);
-        }
-        
-        return new Command({
-          update: {
-            section: updatedSection,
-            completed_sections: [updatedSection]
-          },
-          goto: END
-        });
-      }
-      
-      console.log("[DEBUG] セクション不合格: さらなる調査が必要");
-      // 進捗状況を通知
-      if (progressCallback) {
-        await progressCallback(`セクション「${section.name}」はさらなる調査が必要です`);
-      }
-      // Update the existing section with new content and update search queries
-      return new Command({
-        update: {
-          search_queries: feedback.follow_up_queries || [],
-          section: updatedSection
-        },
-        goto: "generate_queries"
-      });
-    } catch (error) {
-      console.error("[DEBUG] フィードバックJSONの解析エラー:", error);
-      // If we can't parse feedback, just complete the section
-      console.log(`[DEBUG] フィードバック解析エラーのため、セクションを完了とします: "${updatedSection.name}", 内容長=${Object.keys(updatedSection.content).length}`);
       return new Command({
         update: {
           section: updatedSection,
-          completed_sections: [updatedSection]
+          completed_sections: updatedCompletedSections
         },
         goto: END
       });
     }
-  } catch (error) {
-    console.error("[DEBUG] 一般的なエラーが発生:", error);
-    // If we can't generate proper content, complete with what we have
-    // or provide a simple message
+    
+    // 単純なテキスト応答の場合
+    if (typeof contentData === 'string') {
+      console.log(`[DEBUG] セクション執筆結果は単純なテキストです`);
+      
+      const updatedSection = {
+        ...section,
+        content: contentData
+      };
+      
+      // 既存の完了セクションとマージ
+      const updatedCompletedSections = [...state.completed_sections];
+      const existingIndex = updatedCompletedSections.findIndex(s => 
+        s.name.toLowerCase() === section.name.toLowerCase()
+      );
+      
+      if (existingIndex >= 0) {
+        console.log(`[DEBUG] 既存の完了セクション[${existingIndex}]を更新: 「${section.name}」`);
+        updatedCompletedSections[existingIndex] = updatedSection;
+      } else {
+        console.log(`[DEBUG] 新しい完了セクションを追加: 「${section.name}」`);
+        updatedCompletedSections.push(updatedSection);
+      }
+      
+      console.log(`[DEBUG] テキスト結果時の完了セクション数: ${updatedCompletedSections.length}`);
+      
+      return new Command({
+        update: {
+          section: updatedSection,
+          completed_sections: updatedCompletedSections
+        },
+        goto: END
+      });
+    }
+    
+    // JSONオブジェクトの場合
+    if (typeof contentData === 'object' && !Array.isArray(contentData)) {
+      console.log(`[DEBUG] セクション執筆結果はJSONオブジェクトです`);
+      
+      // contentフィールドを探す
+      if (contentData.content && typeof contentData.content === 'string') {
+        console.log(`[DEBUG] JSONオブジェクトからcontentフィールドを抽出しました: 長さ=${contentData.content.length}`);
+        
+        const updatedSection = {
+          ...section,
+          content: contentData.content
+        };
+        
+        // 既存の完了セクションとマージ
+        const updatedCompletedSections = [...state.completed_sections];
+        const existingIndex = updatedCompletedSections.findIndex(s => 
+          s.name.toLowerCase() === section.name.toLowerCase()
+        );
+        
+        if (existingIndex >= 0) {
+          console.log(`[DEBUG] 既存の完了セクション[${existingIndex}]を更新: 「${section.name}」`);
+          updatedCompletedSections[existingIndex] = updatedSection;
+        } else {
+          console.log(`[DEBUG] 新しい完了セクションを追加: 「${section.name}」`);
+          updatedCompletedSections.push(updatedSection);
+        }
+        
+        console.log(`[DEBUG] JSONオブジェクト結果時の完了セクション数: ${updatedCompletedSections.length}`);
+        
+        return new Command({
+          update: {
+            section: updatedSection,
+            completed_sections: updatedCompletedSections
+          },
+          goto: END
+        });
+      }
+    }
+    
+    // 配列の場合
+    if (Array.isArray(contentData)) {
+      console.log(`[DEBUG] セクション執筆結果は配列です`);
+      // 最初の要素がcontentを持っているか確認
+      if (contentData.length > 0 && typeof contentData[0] === 'object' && contentData[0] !== null) {
+        const firstItem = contentData[0] as Record<string, unknown>;
+        if (firstItem.content && typeof firstItem.content === 'string') {
+          console.log(`[DEBUG] 配列の最初の要素からcontentを抽出します: 長さ=${firstItem.content.length}`);
+          
+          const updatedSection = {
+            ...section,
+            content: firstItem.content
+          };
+          
+          // 既存の完了セクションとマージ
+          const updatedCompletedSections = [...state.completed_sections];
+          const existingIndex = updatedCompletedSections.findIndex(s => 
+            s.name.toLowerCase() === section.name.toLowerCase()
+          );
+          
+          if (existingIndex >= 0) {
+            console.log(`[DEBUG] 既存の完了セクション[${existingIndex}]を更新: 「${section.name}」`);
+            updatedCompletedSections[existingIndex] = updatedSection;
+          } else {
+            console.log(`[DEBUG] 新しい完了セクションを追加: 「${section.name}」`);
+            updatedCompletedSections.push(updatedSection);
+          }
+          
+          console.log(`[DEBUG] 配列結果時の完了セクション数: ${updatedCompletedSections.length}`);
+          
+          return new Command({
+            update: {
+              section: updatedSection,
+              completed_sections: updatedCompletedSections
+            },
+            goto: END
+          });
+        }
+      }
+      
+      // 配列全体を文字列化して使用
+      console.log(`[DEBUG] 配列からcontentを抽出できませんでした。配列を文字列化します`);
+      
+      const updatedSection = {
+        ...section,
+        content: JSON.stringify(contentData, null, 2)
+      };
+      
+      // 既存の完了セクションとマージ
+      const updatedCompletedSections = [...state.completed_sections];
+      const existingIndex = updatedCompletedSections.findIndex(s => 
+        s.name.toLowerCase() === section.name.toLowerCase()
+      );
+      
+      if (existingIndex >= 0) {
+        console.log(`[DEBUG] 既存の完了セクション[${existingIndex}]を更新: 「${section.name}」`);
+        updatedCompletedSections[existingIndex] = updatedSection;
+      } else {
+        console.log(`[DEBUG] 新しい完了セクションを追加: 「${section.name}」`);
+        updatedCompletedSections.push(updatedSection);
+      }
+      
+      console.log(`[DEBUG] 配列文字列化時の完了セクション数: ${updatedCompletedSections.length}`);
+      
+      return new Command({
+        update: {
+          section: updatedSection,
+          completed_sections: updatedCompletedSections
+        },
+        goto: END
+      });
+    }
+    
+    // それでもコンテンツが見つからない場合は元のテキストを使用
+    console.log(`[DEBUG] コンテンツが見つかりませんでした。元のテキストを使用します`);
+    
+    const updatedSection = {
+      ...section,
+      content: contentStr
+    };
+    
+    // 既存の完了セクションとマージ
+    const updatedCompletedSections = [...state.completed_sections];
+    const existingIndex = updatedCompletedSections.findIndex(s => 
+      s.name.toLowerCase() === section.name.toLowerCase()
+    );
+    
+    if (existingIndex >= 0) {
+      console.log(`[DEBUG] 既存の完了セクション[${existingIndex}]を更新: 「${section.name}」`);
+      updatedCompletedSections[existingIndex] = updatedSection;
+    } else {
+      console.log(`[DEBUG] 新しい完了セクションを追加: 「${section.name}」`);
+      updatedCompletedSections.push(updatedSection);
+    }
+    
+    console.log(`[DEBUG] デフォルト処理時の完了セクション数: ${updatedCompletedSections.length}`);
+    
     return new Command({
       update: {
-        section: {
-          ...section,
-          content: `${section.name}に関する情報が見つかりませんでした。`
-        },
+        section: updatedSection,
+        completed_sections: updatedCompletedSections
+      },
+      goto: END
+    });
+  } catch (error) {
+    console.error(`[DEBUG] セクション内容の処理中にエラーが発生: ${error}`);
+    
+    // エラー時はデフォルトのメッセージを使用
+    const updatedSection = {
+      ...section,
+      content: `${section.name}に関する情報の処理中にエラーが発生しました。`
+    };
+    
+    // 既存の完了セクションとマージ
+    const updatedCompletedSections = [...state.completed_sections, updatedSection];
+    console.log(`[DEBUG] 例外発生時の完了セクション数: ${updatedCompletedSections.length}`);
+    
+    return new Command({
+      update: {
+        section: updatedSection,
+        completed_sections: updatedCompletedSections
       },
       goto: END
     });
@@ -835,6 +1082,8 @@ async function writeFinalSections(state: SectionState, config: RunnableConfig) {
   const topic = state.topic;
   const section = state.section;
   const completedReportSections = state.report_sections_from_research;
+  // 既存の完了セクションを維持
+  const existingCompletedSections = state.completed_sections || [];
 
   // Format system instructions
   const systemInstructions = finalSectionWriterInstructions.replace(
@@ -866,25 +1115,109 @@ async function writeFinalSections(state: SectionState, config: RunnableConfig) {
     ? sectionContent.content
     : JSON.stringify(sectionContent.content);
 
-  console.log("[DEBUG] 最終セクション「" + section.name + "」の生成されたコンテンツ長: " + contentStr.length + "文字");
+  console.log(`[DEBUG] 最終セクション「${section.name}」の生成されたコンテンツ長: ${contentStr.length}文字`);
+  console.log(`[DEBUG] 最終セクション内容プレビュー: ${contentStr.substring(0, 100)}...`);
 
-  // Write content to section
-  const updatedSection: Section = {
-    ...section,
-    content: contentStr,
-  };
-
-  // Write the updated section to completed sections
-  return { completed_sections: [updatedSection] };
+  try {
+    // コンテンツをJSONとして解析する
+    const contentData = safeJsonParse<Record<string, unknown>>(contentStr);
+    console.log(`[DEBUG] 最終セクション解析結果:`, contentData);
+    
+    // 更新するセクション
+    let updatedSection: Section;
+    
+    if (contentData && contentData.content && typeof contentData.content === 'string') {
+      // JSONのcontent部分を使用
+      updatedSection = {
+        ...section,
+        content: contentData.content
+      };
+      console.log(`[DEBUG] JSONフォーマットから内容を抽出しました: ${contentData.content.length}文字`);
+    } else {
+      // 元のテキストを使用
+      updatedSection = {
+        ...section,
+        content: contentStr
+      };
+      console.log(`[DEBUG] JSON解析に失敗したため元のテキストを使用: ${contentStr.length}文字`);
+    }
+    
+    console.log(`[DEBUG] 最終セクション「${updatedSection.name}」を完了セクションに追加: 内容長=${updatedSection.content.length}文字`);
+    
+    // 既存のセクションのインデックスを探す
+    const existingIndex = existingCompletedSections.findIndex(s => 
+      s.name.toLowerCase() === updatedSection.name.toLowerCase()
+    );
+    
+    // 新しい完了セクション配列を作成
+    const newCompletedSections = [...existingCompletedSections];
+    
+    // 既存のインデックスがあれば更新、なければ追加
+    if (existingIndex >= 0) {
+      console.log(`[DEBUG] 既存のセクションを更新: ${updatedSection.name}`);
+      newCompletedSections[existingIndex] = updatedSection;
+    } else {
+      console.log(`[DEBUG] 新しいセクションを追加: ${updatedSection.name}`);
+      newCompletedSections.push(updatedSection);
+    }
+    
+    // 既存のセクションを保持しつつ、新しいセクションを追加
+    return {
+      section: updatedSection,
+      completed_sections: newCompletedSections
+    };
+  } catch (error) {
+    console.error(`[ERROR] 最終セクション解析中にエラー: ${error}`);
+    
+    // エラー時は元のテキストを使用
+    const defaultSection = {
+      ...section,
+      content: contentStr
+    };
+    
+    // 既存のセクションのインデックスを探す
+    const existingIndex = existingCompletedSections.findIndex(s => 
+      s.name.toLowerCase() === defaultSection.name.toLowerCase()
+    );
+    
+    // 新しい完了セクション配列を作成
+    const newCompletedSections = [...existingCompletedSections];
+    
+    // 既存のインデックスがあれば更新、なければ追加
+    if (existingIndex >= 0) {
+      console.log(`[DEBUG] (エラー時) 既存のセクションを更新: ${defaultSection.name}`);
+      newCompletedSections[existingIndex] = defaultSection;
+    } else {
+      console.log(`[DEBUG] (エラー時) 新しいセクションを追加: ${defaultSection.name}`);
+      newCompletedSections.push(defaultSection);
+    }
+    
+    return {
+      section: defaultSection,
+      completed_sections: newCompletedSections
+    };
+  }
 }
 
 /**
  * Process all sections in sequence.
  */
 async function processSections(state: ReportState, config?: RunnableConfig) {
-  console.log("[DEBUG] セクション処理開始: 総セクション数=" + state.sections.length);
+  console.log(`[DEBUG] セクション処理開始: 総セクション数=${state.sections.length}`);
+  console.log(`[DEBUG] セクション一覧:`, JSON.stringify(state.sections.map((s, idx) => ({
+    index: idx,
+    name: s.name,
+    research: s.research,
+    contentLength: s.content ? s.content.length : 0
+  })), null, 2));
+  
   const completedSections: Section[] = [...state.completed_sections];
-  console.log("[DEBUG] 既存の完了セクション数=" + completedSections.length);
+  console.log(`[DEBUG] 既存の完了セクション数=${completedSections.length}`);
+  console.log(`[DEBUG] 既存の完了セクション:`, JSON.stringify(completedSections.map((s, idx) => ({
+    index: idx,
+    name: s.name,
+    contentLength: s.content ? s.content.length : 0
+  })), null, 2));
   
   // Get configuration
   const configurable = config ? Configuration.fromRunnableConfig(config) : new Configuration();
@@ -896,16 +1229,22 @@ async function processSections(state: ReportState, config?: RunnableConfig) {
   }
   
   // セクションごとに処理を実行
-  for (const section of state.sections) {
+  for (let i = 0; i < state.sections.length; i++) {
+    const section = state.sections[i];
+    console.log(`[DEBUG] セクション[${i}]「${section.name}」の処理検討中...`);
+    
     // 研究が必要ないセクションはスキップ
     if (!section.research) {
-      console.log("[DEBUG] 研究不要セクションをスキップ: \"" + section.name + "\"");
+      console.log(`[DEBUG] 研究不要セクションをスキップ: セクション[${i}]「${section.name}」`);
       continue;
     }
 
     // 既に完了しているセクションはスキップ
-    if (completedSections.some(s => s.name === section.name && s.content)) {
-      console.log("[DEBUG] 既に完了しているセクションをスキップ: \"" + section.name + "\"");
+    const existingIndex = completedSections.findIndex(s => 
+      s.name.toLowerCase() === section.name.toLowerCase() && s.content
+    );
+    if (existingIndex >= 0) {
+      console.log(`[DEBUG] 既に完了しているセクションをスキップ: セクション[${i}]「${section.name}」, 完了セクション[${existingIndex}]「${completedSections[existingIndex].name}」, 内容長=${completedSections[existingIndex].content ? completedSections[existingIndex].content.length : 0}`);
       continue;
     }
 
@@ -914,11 +1253,11 @@ async function processSections(state: ReportState, config?: RunnableConfig) {
       await progressCallback(`セクション「${section.name}」の調査を開始しています...`);
     }
 
-    console.log("[DEBUG] セクション処理: \"" + section.name + "\"");
+    console.log(`[DEBUG] セクション[${i}]「${section.name}」の処理を開始します`);
     
     // セクション処理のための個別のグラフを作成
     try {
-      console.log("[DEBUG] セクショングラフ作成: \"" + section.name + "\"");
+      console.log(`[DEBUG] セクショングラフ作成: セクション[${i}]「${section.name}」`);
       const sectionBuilder = new StateGraph({
         channels: {
           topic: { value: (x: any, y: any) => y },
@@ -949,59 +1288,66 @@ async function processSections(state: ReportState, config?: RunnableConfig) {
       sectionBuilder.addEdge("search_web" as any, "write_section" as any);
 
       // サブグラフをコンパイル
-      console.log("[DEBUG] セクショングラフコンパイル: \"" + section.name + "\"");
+      console.log(`[DEBUG] セクショングラフコンパイル: セクション[${i}]「${section.name}」`);
       const compiledSectionGraph = sectionBuilder.compile();
 
       // 初期状態を設定
       const initialSectionState = {
         topic: state.topic,
-        section,
-        search_queries: [],
+        section: section,
         search_iterations: 0,
+        search_queries: [],
         source_str: "",
-        completed_sections: [],
-        report_sections_from_research: ""
+        report_sections_from_research: state.report_sections_from_research || "",
+        completed_sections: completedSections
       };
 
       // セクションのサブグラフを実行
-      console.log("[DEBUG] セクショングラフ実行: \"" + section.name + "\"");
+      console.log(`[DEBUG] セクショングラフ実行: セクション[${i}]「${section.name}」`);
       const sectionResult = await compiledSectionGraph.invoke(initialSectionState, config);
       
       // 完了したセクションを収集
-      console.log("[DEBUG] セクショングラフ実行結果:", JSON.stringify({
+      console.log(`[DEBUG] セクション[${i}]「${section.name}」グラフ実行結果:`, JSON.stringify({
         hasCompletedSections: !!sectionResult.completed_sections,
         completedSectionsLength: sectionResult.completed_sections ? sectionResult.completed_sections.length : 0,
-        sectionName: sectionResult.section ? sectionResult.section.name : 'なし',
+        sectionName: sectionResult.section?.name || 'なし',
         sectionContentLength: sectionResult.section?.content ? sectionResult.section.content.length : 0
       }, null, 2));
       
       // セクションの内容が生成されていれば、手動で完了セクションに追加
       if (sectionResult.section?.content) {
-        console.log("[DEBUG] セクションの内容が見つかったため、完了セクションに追加: \"" + sectionResult.section.name + "\", 内容長=" + sectionResult.section.content.length);
+        console.log(`[DEBUG] セクション[${i}]「${sectionResult.section.name}」の内容が見つかったため、完了セクションに追加: 内容長=${sectionResult.section.content.length}`);
         
-        const existingIndex = completedSections.findIndex(s => s.name === sectionResult.section.name);
+        const existingIndex = completedSections.findIndex(s => 
+          s.name.toLowerCase() === sectionResult.section.name.toLowerCase()
+        );
         if (existingIndex >= 0) {
-          console.log("[DEBUG] 既存セクションを更新: \"" + sectionResult.section.name + "\"");
+          console.log(`[DEBUG] 既存セクション[${existingIndex}]を更新: 「${sectionResult.section.name}」`);
           completedSections[existingIndex] = sectionResult.section;
         } else {
-          console.log("[DEBUG] 新規セクションを追加: \"" + sectionResult.section.name + "\"");
+          console.log(`[DEBUG] 新規セクションを追加: 「${sectionResult.section.name}」`);
           completedSections.push(sectionResult.section);
         }
+      } else {
+        console.log(`[DEBUG] セクション[${i}]「${section.name}」の内容が生成されませんでした`);
       }
       
       // completed_sectionsフィールドから追加のセクションを収集
       if (sectionResult.completed_sections && sectionResult.completed_sections.length > 0) {
-        console.log("[DEBUG] 完了したセクション数: " + sectionResult.completed_sections.length);
+        console.log(`[DEBUG] セクション[${i}]の完了セクション数: ${sectionResult.completed_sections.length}`);
         // Add the sections to our completed list
-        for (const completedSection of sectionResult.completed_sections) {
-          console.log("[DEBUG] 完了セクションを処理: \"" + completedSection.name + "\", 内容長=" + (completedSection.content ? completedSection.content.length : 0));
+        for (let j = 0; j < sectionResult.completed_sections.length; j++) {
+          const completedSection = sectionResult.completed_sections[j];
+          console.log(`[DEBUG] 完了セクション[${j}]「${completedSection.name}」を処理: 内容長=${completedSection.content ? completedSection.content.length : 0}`);
           
-          const existingIndex = completedSections.findIndex(s => s.name === completedSection.name);
+          const existingIndex = completedSections.findIndex(s => 
+            s.name.toLowerCase() === completedSection.name.toLowerCase()
+          );
           if (existingIndex >= 0) {
-            console.log("[DEBUG] 既存セクションを更新: \"" + completedSection.name + "\"");
+            console.log(`[DEBUG] 既存セクション[${existingIndex}]を更新: 「${completedSection.name}」`);
             completedSections[existingIndex] = completedSection;
           } else {
-            console.log("[DEBUG] 新規セクションを追加: \"" + completedSection.name + "\"");
+            console.log(`[DEBUG] 新規セクションを追加: 「${completedSection.name}」`);
             completedSections.push(completedSection);
           }
         }
@@ -1011,10 +1357,10 @@ async function processSections(state: ReportState, config?: RunnableConfig) {
           await progressCallback(`セクション「${section.name}」の執筆を完了しました`);
         }
       } else {
-        console.log("[DEBUG] 警告: セクション「" + section.name + "」は実行されましたが、完了セクションは生成されませんでした");
+        console.log(`[DEBUG] 警告: セクション[${i}]「${section.name}」は実行されましたが、完了セクションは生成されませんでした`);
       }
     } catch (error) {
-      console.error("[DEBUG] セクション処理エラー \"" + section.name + "\":", error);
+      console.error(`[DEBUG] セクション[${i}]「${section.name}」処理エラー:`, error);
       
       // エラー発生時も進捗状況を通知
       if (progressCallback) {
@@ -1022,7 +1368,7 @@ async function processSections(state: ReportState, config?: RunnableConfig) {
       }
       
       // エラーが発生しても、簡単な内容を持つセクションを作成して進める
-      console.log("[DEBUG] エラーが発生したため、デフォルト内容のセクションを作成: \"" + section.name + "\"");
+      console.log(`[DEBUG] エラーが発生したため、デフォルト内容のセクションを作成: セクション[${i}]「${section.name}」`);
       const defaultSection = {
         ...section,
         content: `${section.name}に関する情報の収集中にエラーが発生しました。`
@@ -1031,8 +1377,9 @@ async function processSections(state: ReportState, config?: RunnableConfig) {
     }
   }
 
-  console.log("[DEBUG] 全セクション処理完了: 完了セクション数=" + completedSections.length);
-  console.log("[DEBUG] 完了セクション詳細:", JSON.stringify(completedSections.map(s => ({ 
+  console.log(`[DEBUG] 全セクション処理完了: 完了セクション数=${completedSections.length}`);
+  console.log(`[DEBUG] 完了セクション詳細:`, JSON.stringify(completedSections.map((s, idx) => ({ 
+    index: idx,
     name: s.name, 
     contentLength: s.content ? s.content.length : 0,
     contentPreview: s.content ? s.content.substring(0, 50) + "..." : "内容なし"
@@ -1063,23 +1410,49 @@ function gatherCompletedSections(state: ReportState) {
  * Create parallel tasks for writing non-research sections.
  */
 function initiateFinalSectionWriting(state: ReportState) {
-  console.log("Initiating final section writing");
+  console.log(`[DEBUG] 最終セクション執筆開始: sections=${state.sections.length}, completed_sections=${state.completed_sections.length}`);
   
-  // Kick off section writing in parallel for any sections that do not require research
-  const commands = state.sections
-    .filter(s => !s.research)
-    .map(s => 
-      new Send("write_final_sections", {
-        topic: state.topic,
-        section: s,
-        report_sections_from_research: state.report_sections_from_research,
-      })
-    );
+  // すべてのセクションの状態を出力
+  console.log(`[DEBUG] セクション一覧:`, JSON.stringify(state.sections.map((s, idx) => ({
+    index: idx,
+    name: s.name,
+    research: s.research,
+    hasContent: !!s.content,
+    contentLength: s.content ? s.content.length : 0
+  })), null, 2));
   
-  if (commands.length === 0) {
-    // If no non-research sections, go directly to compile final report
+  // 研究不要なセクションだけを処理
+  const nonResearchSections = state.sections.filter(s => !s.research);
+  console.log(`[DEBUG] 研究不要セクション数: ${nonResearchSections.length}`);
+  console.log(`[DEBUG] 研究不要セクション:`, JSON.stringify(nonResearchSections.map(s => s.name), null, 2));
+  
+  // 既存の完了セクションの名前を取得（大文字小文字を区別しない）
+  const completedSectionNames = state.completed_sections.map(s => s.name.toLowerCase());
+  console.log(`[DEBUG] 完了済みセクション名:`, JSON.stringify(completedSectionNames, null, 2));
+  
+  // まだ処理されていない研究不要セクションを特定
+  const sectionsToProcess = nonResearchSections.filter(s => 
+    !completedSectionNames.includes(s.name.toLowerCase())
+  );
+  console.log(`[DEBUG] 処理が必要なセクション数: ${sectionsToProcess.length}`);
+  
+  if (sectionsToProcess.length === 0) {
+    // 処理が必要なセクションがない場合は直接最終レポート作成へ
+    console.log(`[DEBUG] 処理が必要なセクションがないため、直接最終レポート作成へ進みます`);
     return ["compile_final_report"];
   }
+  
+  // セクション執筆タスクを生成（未処理のセクションのみ）
+  const commands = sectionsToProcess.map(s => {
+    console.log(`[DEBUG] 最終セクション執筆タスク作成: セクション「${s.name}」`);
+    return new Send("write_final_sections", {
+      topic: state.topic,
+      section: s,
+      report_sections_from_research: state.report_sections_from_research,
+      // 既存の完了セクションも引き継ぐ
+      completed_sections: [...state.completed_sections]
+    });
+  });
   
   return commands;
 }
@@ -1089,36 +1462,122 @@ function initiateFinalSectionWriting(state: ReportState) {
  */
 function compileFinalReport(state: ReportState) {
   console.log("Compiling final report");
-  
   // Get sections
   const sections = state.sections;
-  console.log("[DEBUG] セクション数: " + sections.length);
-  console.log("[DEBUG] セクション詳細:", JSON.stringify(sections.map(s => ({ name: s.name, contentLength: s.content ? s.content.length : 0 })), null, 2));
   
-  const completedSections = state.completed_sections.reduce((map, section) => {
-    map[section.name] = section.content;
-    return map;
-  }, {} as Record<string, string>);
+  // 完了セクションの構造を詳細に確認
+  console.log("[DEBUG] completed_sections の構造:", JSON.stringify({
+    length: state.completed_sections.length,
+    isArray: Array.isArray(state.completed_sections),
+    prototype: Object.prototype.toString.call(state.completed_sections)
+  }));
+  
+  // 完了セクションの最初の要素を詳細に表示（存在する場合）
+  if (state.completed_sections.length > 0) {
+    console.log("[DEBUG] 最初の完了セクションの詳細:", JSON.stringify({
+      keys: Object.keys(state.completed_sections[0]),
+      hasContent: !!state.completed_sections[0].content,
+      contentType: typeof state.completed_sections[0].content,
+      contentLength: state.completed_sections[0].content ? state.completed_sections[0].content.length : 0,
+      contentPreview: state.completed_sections[0].content ? state.completed_sections[0].content.substring(0, 100) : "なし",
+      name: state.completed_sections[0].name
+    }, null, 2));
+  }
   
   console.log("[DEBUG] 完了セクション数: " + state.completed_sections.length);
-  console.log("[DEBUG] 完了セクション詳細:", JSON.stringify(state.completed_sections.map(s => ({ name: s.name, contentLength: s.content ? s.content.length : 0 })), null, 2));
-  console.log("[DEBUG] 完了セクションのマップ:", JSON.stringify(Object.keys(completedSections), null, 2));
+  console.log("[DEBUG] セクション数: " + sections.length);
+  
+  // セクション状態の詳細レポート
+  console.log("[DEBUG] セクション詳細:", JSON.stringify(sections.map((s, idx) => ({
+    index: idx,
+    name: s.name,
+    research: s.research,
+    hasContent: !!s.content,
+    contentLength: s.content ? s.content.length : 0,
+    inCompletedSections: state.completed_sections.some(cs => cs.name.toLowerCase() === s.name.toLowerCase())
+  })), null, 2));
+  
+  // 完了セクションの詳細を表示
+  for (let i = 0; i < state.completed_sections.length; i++) {
+    const section = state.completed_sections[i];
+    console.log(`[DEBUG] 完了セクション[${i}]: ${section.name}, 内容長=${section.content ? section.content.length : 0}`);
+    if (section.content) {
+      console.log(`[DEBUG] 内容プレビュー: ${section.content.substring(0, 50)}...`);
+    }
+  }
+  
+  // 研究が不要なセクションで完了セクションに追加されていないものを追加する
+  // ここが重要な修正ポイント
+  const completedSectionNames = state.completed_sections.map(s => s.name.toLowerCase());
+  const additionalSections: Section[] = [];
+  
+  // 元のセクションをループして、未処理の研究不要セクションを探す
+  for (const section of sections) {
+    // 完了セクションに含まれていない場合のみ処理
+    if (!completedSectionNames.includes(section.name.toLowerCase())) {
+      // 研究不要（research=false）のセクションは、内容が生成されていれば追加
+      // 内容が生成されていない場合は追加しない（スキップする）
+      if (section.content) {
+        console.log(`[DEBUG] 未処理セクション「${section.name}」に内容があるため、最終レポートに含めます`);
+        additionalSections.push({
+          ...section,
+          content: section.content
+        });
+      } else {
+        console.log(`[DEBUG] 未処理セクション「${section.name}」には内容がないため、最終レポートには含めません`);
+      }
+    }
+  }
+  
+  // 完了セクションと未処理セクションを結合
+  const allCompletedSections = [...state.completed_sections, ...additionalSections];
+  console.log(`[DEBUG] 最終的な完了セクション数: ${allCompletedSections.length}`);
+  
+  // 名前で完了セクションをマップに格納（大文字小文字を区別しない）
+  const completedSectionsMap = new Map<string, Section>();
+  for (const section of allCompletedSections) {
+    // セクション名を小文字に変換して大文字小文字の違いを無視する
+    // 内容が確実に存在するもののみマップに追加
+    if (section.content && section.content.trim().length > 0) {
+      completedSectionsMap.set(section.name.toLowerCase(), section);
+    }
+  }
+  
+  console.log("[DEBUG] 完了セクションのマップキー:", JSON.stringify(Array.from(completedSectionsMap.keys()), null, 2));
 
-  // Update sections with completed content while maintaining original order
-  const updatedSections = sections.map(section => {
-    const hasContent = completedSections[section.name] !== undefined;
-    console.log("[DEBUG] セクション「" + section.name + "」の更新: 内容あり=" + hasContent + ", 内容長=" + (hasContent ? completedSections[section.name].length : 0));
-    return {
-      ...section,
-      content: completedSections[section.name] || "Content not available",
-    };
-  });
-
-  console.log("[DEBUG] 更新後のセクション詳細:", JSON.stringify(updatedSections.map(s => ({ name: s.name, contentLength: s.content ? s.content.length : 0, contentPreview: s.content.substring(0, 50) })), null, 2));
-
-  // Compile final report
+  // 元のセクション順序を維持しながら更新
+  // 内容がある完了セクションだけをフィルタリング
+  const updatedSections = sections
+    .map(section => {
+      // 完了セクションから対応するセクションを取得（大文字小文字を無視）
+      const completedSection = completedSectionsMap.get(section.name.toLowerCase());
+      
+      console.log(`[DEBUG] セクション「${section.name}」の更新:`, JSON.stringify({
+        found: !!completedSection,
+        completedName: completedSection ? completedSection.name : "なし",
+        hasContent: !!(completedSection?.content),
+        contentLength: completedSection?.content ? completedSection.content.length : 0
+      }));
+      
+      // 対応するセクションがあれば更新、なければnullを返す
+      if (completedSection?.content) {
+        return {
+          ...section,
+          content: completedSection.content
+        };
+      }
+      return null;
+    })
+    .filter(section => section !== null) as Section[]; // nullを除外
+  
+  // 最終レポートをコンパイル
   const allSections = updatedSections.map(s => `# ${s.name}\n\n${s.content}`).join("\n\n");
   console.log("[DEBUG] 最終レポート長: " + allSections.length);
+  console.log("[DEBUG] 最終セクション内容プレビュー:", updatedSections.map(s => ({ 
+    name: s.name,
+    contentLength: s.content ? s.content.length : 0,
+    contentPreview: s.content ? s.content.substring(0, 50) + "..." : "なし" 
+  })));
 
   return { final_report: allSections };
 }

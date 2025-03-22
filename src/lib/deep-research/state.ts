@@ -166,27 +166,10 @@ export interface ResearchState {
   currentStep: string;
   /** エラーメッセージ（存在する場合） */
   error?: string;
-  /** セクションごとの検索クエリのリスト */
-  searchQueries?: Array<{
-    section: string;
-    queries: string[];
-  }>;
-  /** Web検索の結果 */
-  searchResults?: SearchResult[];
+  /** 検索クエリのリスト */
+  queries?: SearchQuery[];
   /** 完了したセクション */
   completedSections?: Section[];
   /** 最終的なレポート内容 */
   finalReport?: string;
-}
-
-/**
- * 検索結果を表すインターフェース
- */
-export interface SearchResult {
-  /** 検索結果のタイトル */
-  title: string;
-  /** 検索結果のURL */
-  url: string;
-  /** 検索結果の内容 */
-  content: string;
 } 

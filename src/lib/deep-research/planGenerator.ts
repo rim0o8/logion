@@ -91,7 +91,13 @@ export async function generateReportPlan(state: ResearchState): Promise<Research
     const planData = safeJsonParse<{ 
       sections?: Array<{ name?: string; title?: string; description?: string }>;
       content?: Array<{ name?: string; title?: string; description?: string }>;
-    }>(planContent, { sections: [] });
+    }>(planContent);
+    
+    // JSONの解析に失敗した場合は空のオブジェクトを使用
+    if (planData === null) {
+      console.log("[WARNING] 計画データの解析に失敗しました");
+      return { ...state, sections: [] };
+    }
     
     // セクションフィールドを探す
     let sections = null;

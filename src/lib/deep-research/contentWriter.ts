@@ -26,7 +26,13 @@ const SECTION_INPUTS_TEMPLATE = sectionWriterInputs;
 function extractContentFromResponse(content: string): string {
   try {
     // JSONオブジェクトからコンテンツフィールドを抽出する
-    const contentData = safeJsonParse<{ content?: string }>(content, { content: undefined });
+    const contentData = safeJsonParse<{ content?: string }>(content);
+    
+    // JSONの解析に失敗した場合は元のテキストを返す
+    if (contentData === null) {
+      console.log(`[DEBUG] JSONの解析に失敗しました。元のテキストを使用します: ${content.length}文字`);
+      return content;
+    }
     
     // コンテンツフィールドがある場合はそれを使用
     if (contentData.content) {

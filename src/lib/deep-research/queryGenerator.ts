@@ -73,15 +73,17 @@ export async function generateQueries(state: ResearchState): Promise<Partial<Res
         });
         
         const queryData = safeJsonParse<{ queries: Array<{ search_query: string }> }>(
-          queryContent,
-          { queries: [] }
+          queryContent
         );
         
-        if (queryData.queries && queryData.queries.length > 0) {
+        // JSONの解析に失敗した場合、空の配列をデフォルトとして使用
+        const queries = queryData?.queries || [];
+        
+        if (queries.length > 0) {
           // セクション名とクエリを関連付けて保存
           searchQueries.push({
             section: section.name,
-            queries: queryData.queries.map(q => q.search_query),
+            queries: queries.map(q => q.search_query),
           });
         }
         
