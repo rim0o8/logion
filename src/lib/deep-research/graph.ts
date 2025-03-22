@@ -31,7 +31,7 @@ import {
 
 // Helper to initialize chat model
 function initChatModel(model: string, modelProvider: string) {
-  console.log(`[DEBUG] モデル初期化: provider=${modelProvider}, model=${model}`);
+  console.log(`モデル初期化: provider=${modelProvider}, model=${model}`);
   switch (modelProvider.toLowerCase()) {
     case 'anthropic':
       return new ChatAnthropic({
@@ -61,7 +61,7 @@ function initChatModel(model: string, modelProvider: string) {
  * 4. Uses an LLM to generate a structured plan with sections
  */
 async function generateReportPlan(state: ReportState, config: RunnableConfig) {
-  console.log("[DEBUG] レポートプラン生成開始: トピック=", state.topic);
+  console.log("レポートプラン生成開始: トピック=", state.topic);
   
   // Inputs
   const topic = state.topic;
@@ -76,8 +76,7 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
   const paramsToPass = getSearchParams(searchApi, searchApiConfig);
   const progressCallback = configurable.progressCallback;
 
-  console.log(`[DEBUG] 設定: searchApi=${searchApi}, numberOfQueries=${numberOfQueries}`);
-  console.log("[DEBUG] 検索パラメータ:", paramsToPass);
+  console.log(`設定: searchApi=${searchApi}, numberOfQueries=${numberOfQueries}`);
 
   // 進捗状況を通知
   if (progressCallback) {
@@ -98,8 +97,6 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
     "{numberOfQueries}", numberOfQueries.toString()
   );
 
-  console.log(`[DEBUG] クエリ生成用システムプロンプト長: ${systemInstructionsQuery.length}文字`);
-
   // 進捗状況を通知
   if (progressCallback) {
     await progressCallback("検索クエリを生成しています...");
@@ -116,8 +113,6 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
     ? queriesResult.content 
     : JSON.stringify(queriesResult.content);
   
-  console.log("[DEBUG] 生成されたクエリレスポンス:", queriesText);
-  
   let queries: unknown[] = [];
   try {
     // safeJsonParseを使用してJSONを解析
@@ -125,7 +120,7 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
     
     // JSONの解析に失敗した場合は空の配列を使用
     if (queriesData === null) {
-      console.log("[WARNING] クエリデータの解析に失敗しました。空の配列を使用します。");
+      console.log("クエリデータの解析に失敗しました。空の配列を使用します。");
       return [];
     }
     
@@ -149,8 +144,6 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
       }
     }
     
-    console.log("[DEBUG] 解析されたクエリ:", JSON.stringify(queries, null, 2));
-    
     // クエリのフィールド名を確認し、正規化
     if (queries.length > 0) {
       if (typeof queries[0] === 'string') {
@@ -173,7 +166,7 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
     
     // クエリが空の場合、デフォルトクエリを設定
     if (!queries || !Array.isArray(queries) || queries.length === 0) {
-      console.log("[DEBUG] クエリの解析に失敗したため、デフォルトクエリを使用します");
+      console.log("クエリの解析に失敗したため、デフォルトクエリを使用します");
       queries = [
         { search_query: `${topic} overview` },
         { search_query: `${topic} explanation` },
@@ -181,8 +174,8 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
       ];
     }
   } catch (error) {
-    console.error("[DEBUG] クエリの解析に失敗:", error);
-    console.log("[DEBUG] クエリの解析に失敗したため、デフォルトクエリを使用します");
+    console.error("クエリの解析に失敗:", error);
+    console.log("クエリの解析に失敗したため、デフォルトクエリを使用します");
     queries = [
       { search_query: `${topic} overview` },
       { search_query: `${topic} explanation` },
@@ -193,20 +186,16 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
   // Execute search for each query
   const queryList = queries.map(q => q.search_query).filter(Boolean);
   
-  // クエリリストをログに出力
-  console.log("[DEBUG] 検索クエリリスト:", queryList);
-  
   // 進捗状況を通知
   if (progressCallback) {
     await progressCallback("トピックに関する情報を検索しています...");
   }
   // Search the web with parameters
-  console.log(`[DEBUG] 検索実行: API=${searchApi}, クエリ数=${queryList.length}`);
+  console.log(`検索実行: API=${searchApi}, クエリ数=${queryList.length}`);
   const results = await selectAndExecuteSearch(searchApi, queryList, searchApiConfig);
-  console.log(`[DEBUG] 検索結果: ${results.length}件取得`);
+  console.log(`検索結果: ${results.length}件取得`);
   
   const formattedResults = formatSearchResults(results);
-  console.log(`[DEBUG] フォーマット済み検索結果長: ${formattedResults.length}文字`);
 
   // Format system instructions for plan generation
   const systemInstructions = reportPlannerInstructions.replace(
@@ -218,8 +207,6 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
   ).replace(
     "{feedback}", feedback || "No feedback provided."
   );
-
-  console.log(`[DEBUG] プラン生成用システムプロンプト長: ${systemInstructions.length}文字`);
 
   // 進捗状況を通知
   if (progressCallback) {
@@ -235,7 +222,7 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
   const plannerMessage = "Generate the sections of the report. Your response must include a 'sections' field containing a list of sections. " +
                         "Each section must have: name, description, plan, research, and content fields.";
   
-  console.log(`[DEBUG] プランナーモデル呼び出し: ${plannerModelName}`);
+  console.log(`プランナーモデル呼び出し: ${plannerModelName}`);
   const sectionsResult = await plannerModel.invoke([
     new SystemMessage(systemInstructions),
     new HumanMessage(plannerMessage),
@@ -246,28 +233,25 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
     ? sectionsResult.content
     : JSON.stringify(sectionsResult.content);
   
-  console.log(`[DEBUG] セクション生成結果長: ${contentStr.length}文字`);
-  
   try {
     // コンテンツをJSONとして解析する - safeJsonParseを使用
     const contentData = safeJsonParse<Record<string, unknown> | unknown[]>(contentStr);
-    console.log("[DEBUG] セクション生成結果データ:", contentData);
     
     // JSONの解析に失敗した場合
     if (contentData === null) {
-      console.log("[WARNING] コンテンツデータの解析に失敗しました。プレーンテキストを解析します。");
+      console.log("コンテンツデータの解析に失敗しました。プレーンテキストを解析します。");
       // プレーンテキストをMarkdownのセクションとして解釈
       try {
         const extractedSections = extractSectionsFromText(contentStr, topic);
         if (extractedSections.length > 0) {
-          console.log(`[DEBUG] プレーンテキストから${extractedSections.length}個のセクションを抽出しました`);
+          console.log(`プレーンテキストから${extractedSections.length}個のセクションを抽出しました`);
           return {
             ...state,
             sections: extractedSections
           };
         }
       } catch (e) {
-        console.log("[DEBUG] プレーンテキスト解析も失敗:", e);
+        console.log("プレーンテキスト解析も失敗:", e);
       }
       
       // 解析に失敗した場合はデフォルトのセクションを使用
@@ -304,7 +288,7 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
     
     // 配列が直接返された場合
     if (Array.isArray(contentData)) {
-      console.log("[DEBUG] コンテンツデータは直接配列です。セクションとして使用します。");
+      console.log("コンテンツデータは直接配列です。セクションとして使用します。");
       sectionsArray = contentData;
     } 
     // オブジェクトの場合、sections配列を探す
@@ -335,7 +319,7 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
     
     // それでもセクションが見つからない場合、デフォルトセクションを使用
     if (sectionsArray.length === 0) {
-      console.log("[WARNING] セクションが見つかりませんでした。デフォルトセクションを使用します。");
+      console.log("セクションが見つかりませんでした。デフォルトセクションを使用します。");
       return {
         ...state,
         sections: [
@@ -401,10 +385,7 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
       };
     });
     
-    console.log(`[DEBUG] 解析されたセクション数: ${normalizedSections.length}`);
-    if (normalizedSections.length > 0) {
-      console.log(`[DEBUG] 最初のセクション: ${JSON.stringify(normalizedSections[0], null, 2)}`);
-    }
+    console.log(`解析されたセクション数: ${normalizedSections.length}`);
     
     // Return command with sections
     return {
@@ -412,7 +393,7 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
       sections: normalizedSections
     };
   } catch (error) {
-    console.error("[DEBUG] セクション解析エラー:", error);
+    console.error("セクション解析エラー:", error);
     // Default sections if parsing fails
     const defaultSections = [
       {
@@ -438,7 +419,7 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
       }
     ];
     
-    console.log(`[DEBUG] デフォルトセクションを使用: ${defaultSections.length}セクション`);
+    console.log(`デフォルトセクションを使用: ${defaultSections.length}セクション`);
     return { sections: defaultSections };
   }
 }
@@ -447,7 +428,7 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
  * テキストから構造化されたセクションを抽出するヘルパー関数
  */
 function /* eslint-disable @typescript-eslint/no-unused-vars */ extractSectionsFromText/* eslint-enable @typescript-eslint/no-unused-vars */(text: string, topic: string): Section[] {
-  console.log("[DEBUG] テキストからセクションを抽出しています...");
+  console.log("テキストからセクションを抽出しています...");
   
   // セクションのヘッダーを検出するための正規表現
   const sectionHeaderRegex = /(?:^|\n)#+\s+(.+?)(?:\n|$)/g;
@@ -487,16 +468,13 @@ function humanFeedback(state: ReportState) {
   // Get sections
   // const topic = state.topic;
   const sections = state.sections;
-  // const sectionsStr = sections.map(
-  //   section => `Section: ${section.name}\nDescription: ${section.description}\nResearch needed: ${section.research ? 'Yes' : 'No'}`
-  // ).join("\n\n");
 
-  console.log(`[DEBUG] フィードバック処理: セクション数=${sections.length}, フィードバック有無=${!!state.feedback_on_report_plan}`);
+  console.log(`フィードバック処理: セクション数=${sections.length}, フィードバック有無=${!!state.feedback_on_report_plan}`);
 
   // In the TypeScript version, we'll use a simpler approach since we don't have interactivity
   // We'll check if there's feedback; if so, regenerate the plan, otherwise proceed
   if (state.feedback_on_report_plan) {
-    console.log("[DEBUG] フィードバックあり: プラン再生成へ遷移");
+    console.log("フィードバックあり: プラン再生成へ遷移");
     // Return to generate_report_plan with feedback
     return new Command({
       goto: "generate_report_plan",
@@ -508,17 +486,17 @@ function humanFeedback(state: ReportState) {
   
   // Proceed to process sections that need research
   const researchSections = sections.filter(s => s.research);
-  console.log(`[DEBUG] 調査が必要なセクション数: ${researchSections.length}`);
+  console.log(`調査が必要なセクション数: ${researchSections.length}`);
   
   if (researchSections.length === 0) {
-    console.log("[DEBUG] 調査が必要なセクションなし: セクション収集へ遷移");
+    console.log("調査が必要なセクションなし: セクション収集へ遷移");
     // If no sections need research, go straight to gathering sections
     return new Command({
       goto: "gather_completed_sections"
     });
   }
   
-  console.log("[DEBUG] セクション処理へ遷移");
+  console.log("セクション処理へ遷移");
   // Otherwise, start researching each section in sequence
   return new Command({
     goto: "process_sections"
@@ -529,7 +507,7 @@ function humanFeedback(state: ReportState) {
  * Generate search queries for researching a specific section.
  */
 async function generateQueries(state: SectionState, config: RunnableConfig) {
-  console.log(`[DEBUG] クエリ生成: セクション="${state.section.name}"`);
+  console.log(`クエリ生成: セクション="${state.section.name}"`);
   
   // Get state
   const topic = state.topic;
@@ -557,11 +535,9 @@ async function generateQueries(state: SectionState, config: RunnableConfig) {
     "{numberOfQueries}", numberOfQueries.toString()
   );
 
-  console.log(`[DEBUG] クエリ生成用システムプロンプト長: ${systemInstructions.length}文字`);
-
   try {
     // Generate queries
-    console.log(`[DEBUG] クエリ生成モデル呼び出し: ${writerModelName}`);
+    console.log(`クエリ生成モデル呼び出し: ${writerModelName}`);
     const queriesResult = await writerModel.invoke([
       new SystemMessage(systemInstructions),
       new HumanMessage(`Generate ${numberOfQueries} search queries about ${topic}, focusing on the section "${section.name}". Return as JSON with a "queries" array containing objects with "search_query" field. Format must be: {"queries": [{"search_query": "query text"}, ...]}`),
@@ -572,16 +548,13 @@ async function generateQueries(state: SectionState, config: RunnableConfig) {
       ? queriesResult.content 
       : JSON.stringify(queriesResult.content);
     
-    console.log(`[DEBUG] 生成されたクエリレスポンス長: ${queriesText.length}文字`);
-    console.log(`[DEBUG] 生成されたクエリ内容: ${queriesText.substring(0, 200)}...`);
-    
     try {
       // safeJsonParseを使用してJSONを解析
       const queriesData = safeJsonParse<Record<string, unknown> | unknown[]>(queriesText);
       
       // JSONの解析に失敗した場合は空の配列を使用
       if (queriesData === null) {
-        console.log("[WARNING] クエリデータの解析に失敗しました。デフォルトクエリを使用します。");
+        console.log("クエリデータの解析に失敗しました。デフォルトクエリを使用します。");
         return { 
           search_queries: [
             { search_query: `${topic} ${section.name}` },
@@ -595,28 +568,23 @@ async function generateQueries(state: SectionState, config: RunnableConfig) {
       
       if (Array.isArray(queriesData)) {
         // 配列として直接返された場合
-        console.log("[DEBUG] クエリデータは直接配列です");
         queryItems = queriesData;
       } else if (typeof queriesData === 'object' && queriesData !== null) {
         // オブジェクト内のqueriesプロパティを探す
         const recordData = queriesData as Record<string, unknown>;
         if (Array.isArray(recordData.queries)) {
-          console.log("[DEBUG] queriesプロパティから配列を抽出しました");
           queryItems = recordData.queries;
         } else {
           // オブジェクトの中のいずれかのプロパティにクエリが含まれている可能性を確認
           for (const key in recordData) {
             const value = recordData[key];
             if (Array.isArray(value) && value.length > 0) {
-              console.log(`[DEBUG] プロパティ「${key}」から配列を抽出しました`);
               queryItems = value;
               break;
             }
           }
         }
       }
-      
-      console.log("[DEBUG] 解析されたクエリ項目数:", queryItems.length);
       
       // クエリのフィールド名を確認し、正規化
       if (queryItems.length > 0) {
@@ -651,24 +619,22 @@ async function generateQueries(state: SectionState, config: RunnableConfig) {
           }
         }
         
-        console.log("[DEBUG] 正規化されたクエリ数:", normalizedQueries.length);
-        
         // 正規化されたクエリがあれば返す
         if (normalizedQueries.length > 0) {
           return { search_queries: normalizedQueries };
         }
       }
     } catch (error) {
-      console.error(`[DEBUG] クエリJSONの解析に失敗: ${error}`);
+      console.error(`クエリJSONの解析に失敗: ${error}`);
       // 解析エラー時は下のデフォルトクエリを使用
     }
   } catch (error) {
-    console.error(`[DEBUG] クエリ生成中にエラーが発生: ${error}`);
+    console.error(`クエリ生成中にエラーが発生: ${error}`);
     // エラー時はデフォルトクエリを使用
   }
   
   // デフォルトクエリの生成
-  console.log("[DEBUG] デフォルトクエリを生成します");
+  console.log("デフォルトクエリを生成します");
   const defaultQueries = [
     { search_query: `${topic} ${section.name}` },
     { search_query: `${section.name} ${section.description}` },
@@ -682,12 +648,12 @@ async function generateQueries(state: SectionState, config: RunnableConfig) {
  * Execute web searches using generated queries.
  */
 async function searchWeb(state: SectionState, config: RunnableConfig) {
-  console.log(`[DEBUG] Web検索実行: セクション="${state.section.name}", 検索回数=${state.search_iterations}`);
+  console.log(`Web検索実行: セクション="${state.section.name}", 検索回数=${state.search_iterations}`);
   
   // State variables
   const search_queries = state.search_queries || [];
   
-  console.log(`[DEBUG] 検索クエリ数: ${search_queries.length}`);
+  console.log(`検索クエリ数: ${search_queries.length}`);
   
   // Get configuration
   const configurable = Configuration.fromRunnableConfig(config);
@@ -703,7 +669,7 @@ async function searchWeb(state: SectionState, config: RunnableConfig) {
   const searchApi = configurable.searchApi || process.env.SEARCH_API || "tavily";
   
   // 検索を実行
-  console.log(`[DEBUG] 検索実行: API=${searchApi}`);
+  console.log(`検索実行: API=${searchApi}`);
   
   let results: SearchResult[] = [];
   
@@ -716,11 +682,11 @@ async function searchWeb(state: SectionState, config: RunnableConfig) {
         
         // クエリが空の場合はスキップまたはデフォルトクエリを使用
         if (!query || query.trim() === '') {
-          console.log('[DEBUG] 空のクエリをスキップするか、デフォルトクエリを使用します');
+          console.log('空のクエリをスキップするか、デフォルトクエリを使用します');
           
           // デフォルトクエリを定義
           const defaultQuery = `${state.topic} ${state.section.name}`;
-          console.log(`[DEBUG] デフォルトクエリを使用: ${defaultQuery}`);
+          console.log(`デフォルトクエリを使用: ${defaultQuery}`);
           
           // 検索API用の設定パラメータを取得
           const searchParams = getSearchParams(searchApi, configurable.searchApiConfig as SearchApiConfigOptions);
@@ -738,7 +704,7 @@ async function searchWeb(state: SectionState, config: RunnableConfig) {
     } else {
       // クエリがない場合はデフォルトクエリを使用
       const defaultQuery = `${state.topic} ${state.section.name}`;
-      console.log(`[DEBUG] デフォルトクエリを生成します: ${defaultQuery}`);
+      console.log(`デフォルトクエリを生成します: ${defaultQuery}`);
       
       // 検索API用の設定パラメータを取得
       const searchParams = getSearchParams(searchApi, configurable.searchApiConfig as SearchApiConfigOptions);
@@ -749,10 +715,10 @@ async function searchWeb(state: SectionState, config: RunnableConfig) {
       }
     }
   } catch (error) {
-    console.error('[DEBUG] 検索実行中にエラーが発生:', error);
+    console.error('検索実行中にエラーが発生:', error);
   }
   
-  console.log(`[DEBUG] 検索結果: ${results.length}件取得`);
+  console.log(`検索結果: ${results.length}件取得`);
   
   // Format results for the section writer
   const formattedResults = formatSearchResults(results);
@@ -773,8 +739,7 @@ async function searchWeb(state: SectionState, config: RunnableConfig) {
  * Write a section based on search results.
  */
 async function writeSection(state: SectionState, config: RunnableConfig) {
-  console.log(`[DEBUG] セクション執筆: セクション="${state.section.name}", 検索回数=${state.search_iterations}`);
-  console.log(`[DEBUG] セクション執筆時の既存完了セクション数=${state.completed_sections.length}`);
+  console.log(`セクション執筆: セクション="${state.section.name}", 検索回数=${state.search_iterations}`);
   
   // Get state
   const topic = state.topic;
@@ -845,11 +810,11 @@ ${sourceText || "No sources provided. Generate content based on general knowledg
   try {
     // コンテンツをJSONとして解析する - safeJsonParseを使用
     const contentData = safeJsonParse<Record<string, unknown> | unknown[]>(contentStr);
-    console.log(`[DEBUG] セクション執筆結果データ:`, contentData);
+    console.log("[DEBUG] セクション執筆結果データ:", contentData);
     
     // JSONの解析に失敗した場合
     if (contentData === null) {
-      console.log(`[DEBUG] セクション執筆結果の解析に失敗しました。元のコンテンツを使用します。`);
+      console.log("[DEBUG] セクション執筆結果の解析に失敗しました。元のコンテンツを使用します。");
       
       const updatedSection = {
         ...section,
@@ -871,7 +836,7 @@ ${sourceText || "No sources provided. Generate content based on general knowledg
     
     // 単純なテキスト応答の場合
     if (typeof contentData === 'string') {
-      console.log(`[DEBUG] セクション執筆結果は単純なテキストです`);
+      console.log("[DEBUG] セクション執筆結果は単純なテキストです");
       
       const updatedSection = {
         ...section,
@@ -905,7 +870,7 @@ ${sourceText || "No sources provided. Generate content based on general knowledg
     
     // JSONオブジェクトの場合
     if (typeof contentData === 'object' && !Array.isArray(contentData)) {
-      console.log(`[DEBUG] セクション執筆結果はJSONオブジェクトです`);
+      console.log("[DEBUG] セクション執筆結果はJSONオブジェクトです");
       
       // contentフィールドを探す
       if (contentData.content && typeof contentData.content === 'string') {
@@ -944,7 +909,7 @@ ${sourceText || "No sources provided. Generate content based on general knowledg
     
     // 配列の場合
     if (Array.isArray(contentData)) {
-      console.log(`[DEBUG] セクション執筆結果は配列です`);
+      console.log("[DEBUG] セクション執筆結果は配列です");
       // 最初の要素がcontentを持っているか確認
       if (contentData.length > 0 && typeof contentData[0] === 'object' && contentData[0] !== null) {
         const firstItem = contentData[0] as Record<string, unknown>;
@@ -983,7 +948,7 @@ ${sourceText || "No sources provided. Generate content based on general knowledg
       }
       
       // 配列全体を文字列化して使用
-      console.log(`[DEBUG] 配列からcontentを抽出できませんでした。配列を文字列化します`);
+      console.log("[DEBUG] 配列からcontentを抽出できませんでした。配列を文字列化します");
       
       const updatedSection = {
         ...section,
@@ -1016,7 +981,7 @@ ${sourceText || "No sources provided. Generate content based on general knowledg
     }
     
     // それでもコンテンツが見つからない場合は元のテキストを使用
-    console.log(`[DEBUG] コンテンツが見つかりませんでした。元のテキストを使用します`);
+    console.log("[DEBUG] コンテンツが見つかりませんでした。元のテキストを使用します");
     
     const updatedSection = {
       ...section,
@@ -1121,7 +1086,7 @@ async function writeFinalSections(state: SectionState, config: RunnableConfig) {
   try {
     // コンテンツをJSONとして解析する
     const contentData = safeJsonParse<Record<string, unknown>>(contentStr);
-    console.log(`[DEBUG] 最終セクション解析結果:`, contentData);
+    console.log("[DEBUG] 最終セクション解析結果:", contentData);
     
     // 更新するセクション
     let updatedSection: Section;
@@ -1378,7 +1343,7 @@ async function processSections(state: ReportState, config?: RunnableConfig) {
   }
 
   console.log(`[DEBUG] 全セクション処理完了: 完了セクション数=${completedSections.length}`);
-  console.log(`[DEBUG] 完了セクション詳細:`, JSON.stringify(completedSections.map((s, idx) => ({ 
+  console.log("[DEBUG] 完了セクション詳細:", JSON.stringify(completedSections.map((s, idx) => ({ 
     index: idx,
     name: s.name, 
     contentLength: s.content ? s.content.length : 0,

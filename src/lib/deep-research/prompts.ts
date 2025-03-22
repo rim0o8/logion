@@ -12,6 +12,8 @@ Please organize the report into logical sections that cover the key aspects of t
 2. Write a brief overview of what the section will cover
 3. Indicate whether the section needs web research (true/false)
 
+IMPORTANT: All section names MUST be written in Japanese (日本語).
+
 TOPIC: {topic}
 
 REPORT STRUCTURE:
@@ -24,7 +26,7 @@ OUTPUT FORMAT:
 Return only the JSON array of sections without any additional text.
 [
   {
-    "name": "Section Name",
+    "name": "セクション名（日本語で）",
     "description": "Brief description of the section content",
     "research": true/false,
     "content": ""
@@ -109,12 +111,14 @@ Write a comprehensive section for a report based on the provided sources. Your w
 3. Include relevant details, examples, and context
 4. Be written in a clear, professional style
 
+IMPORTANT: Your section content MUST be written in Japanese (日本語).
+
 {inputs}
 
 FORMAT YOUR RESPONSE AS JSON:
 Return the section content in a JSON object with this format:
 {
-  "content": "Your well-written section content goes here. Include paragraphs, bullet points, etc. as appropriate."
+  "content": "セクションの内容をここに日本語で記述してください。段落、箇条書きなどを適切に含めてください。"
 }`;
 
 /**
@@ -155,6 +159,8 @@ export const finalSectionWriterInstructions = `You are an expert content writer 
 
 Write a complete section for a report without additional web research. Use the information already provided in the research materials and your knowledge to create a well-structured section.
 
+IMPORTANT: Your section content MUST be written in Japanese (日本語).
+
 TOPIC: {topic}
 SECTION NAME: {sectionName}
 SECTION DESCRIPTION: {sectionDescription}
@@ -163,5 +169,5 @@ EXISTING RESEARCH MATERIALS:
 
 FORMAT YOUR RESPONSE AS JSON:
 {
-  "content": "Your well-written section content goes here. Include paragraphs, bullet points, etc. as appropriate."
-}`; 
+  "content": "セクションの内容をここに日本語で記述してください。段落、箇条書きなどを適切に含めてください。"
+}`;
