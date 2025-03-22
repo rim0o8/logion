@@ -140,4 +140,53 @@ export interface SectionState {
 export interface SectionOutputState {
   /** 完了したセクション（外部状態と同期するために複製される） */
   completed_sections: Section[];
+}
+
+/**
+ * 深層研究の状態を表すインターフェース
+ */
+export interface ResearchState {
+  /** レポートのトピック */
+  topic: string;
+  /** 計画生成に使用するモデル */
+  planModel: string;
+  /** 計画生成に使用するモデルプロバイダー */
+  planModelProvider: string;
+  /** クエリ生成に使用するモデル */
+  queryModel?: string;
+  /** クエリ生成に使用するモデルプロバイダー */
+  queryModelProvider?: string;
+  /** セクション執筆に使用するモデル */
+  writeModel?: string;
+  /** セクション執筆に使用するモデルプロバイダー */
+  writeModelProvider?: string;
+  /** レポートセクションのリスト */
+  sections: Section[];
+  /** 現在のプロセスステップ */
+  currentStep: string;
+  /** エラーメッセージ（存在する場合） */
+  error?: string;
+  /** セクションごとの検索クエリのリスト */
+  searchQueries?: Array<{
+    section: string;
+    queries: string[];
+  }>;
+  /** Web検索の結果 */
+  searchResults?: SearchResult[];
+  /** 完了したセクション */
+  completedSections?: Section[];
+  /** 最終的なレポート内容 */
+  finalReport?: string;
+}
+
+/**
+ * 検索結果を表すインターフェース
+ */
+export interface SearchResult {
+  /** 検索結果のタイトル */
+  title: string;
+  /** 検索結果のURL */
+  url: string;
+  /** 検索結果の内容 */
+  content: string;
 } 

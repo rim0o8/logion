@@ -3,9 +3,9 @@ import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import { ChatDeepSeek } from "@langchain/deepseek";
-import { Command, END, START, Send, StateGraph } from "@langchain/langgraph";
+import { Command, END, Send, StateGraph } from "@langchain/langgraph";
 import { ChatOpenAI } from "@langchain/openai";
-import { Configuration, SearchApiConfigOptions } from "./configuration";
+import { Configuration, type SearchApiConfigOptions } from "./configuration";
 import {
   finalSectionWriterInstructions,
   queryWriterInstructions,
@@ -14,15 +14,16 @@ import {
   sectionGraderInstructions,
   sectionWriterInstructions
 } from "./prompts";
-import {
+import type {
   Feedback,
   ReportState,
   SearchQuery,
   Section,
   SectionState
 } from "./state";
+import { safeJsonParse } from "./textUtils";
 import {
-  SearchResult,
+  type SearchResult,
   formatSearchResults,
   formatSections,
   getConfigValue,
@@ -78,7 +79,7 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
   const progressCallback = configurable.progressCallback;
 
   console.log(`[DEBUG] 設定: searchApi=${searchApi}, numberOfQueries=${numberOfQueries}`);
-  console.log(`[DEBUG] 検索パラメータ:`, paramsToPass);
+  console.log("[DEBUG] 検索パラメータ:", paramsToPass);
 
   // 進捗状況を通知
   if (progressCallback) {
@@ -117,12 +118,12 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
     ? queriesResult.content 
     : JSON.stringify(queriesResult.content);
   
-  console.log(`[DEBUG] 生成されたクエリレスポンス:`, queriesText);
+  console.log("[DEBUG] 生成されたクエリレスポンス:", queriesText);
   
   let queries = [];
   try {
-    // まずJSON形式として解析を試みる
-    const queriesData = JSON.parse(queriesText);
+    // safeJsonParseを使用してJSONを解析
+    const queriesData = safeJsonParse<Record<string, unknown> | unknown[]>(queriesText, { queries: [] });
     
     if (queriesData.queries && Array.isArray(queriesData.queries)) {
       queries = queriesData.queries;
@@ -139,7 +140,7 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
       }
     }
     
-    console.log(`[DEBUG] 解析されたクエリ:`, JSON.stringify(queries, null, 2));
+    console.log("[DEBUG] 解析されたクエリ:", JSON.stringify(queries, null, 2));
     
     // クエリのフィールド名を確認し、正規化
     if (queries.length > 0) {
@@ -190,7 +191,6 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
   if (progressCallback) {
     await progressCallback("トピックに関する情報を検索しています...");
   }
-
   // Search the web with parameters
   console.log(`[DEBUG] 検索実行: API=${searchApi}, クエリ数=${queryList.length}`);
   const results = await selectAndExecuteSearch(searchApi, queryList, searchApiConfig);
@@ -241,39 +241,8 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
   console.log(`[DEBUG] セクション生成結果内容: ${contentStr.substring(0, 500)}...`);
   
   try {
-    // コンテンツをJSONとして解析する
-    let contentData: Record<string, any>;
-    
-    // 制御文字を処理する前に、生データのままJSONとして解析を試みる
-    try {
-      contentData = JSON.parse(contentStr);
-      console.log(`[DEBUG] 元のコンテンツをJSONとして解析成功`);
-    } catch (initialError) {
-      // 失敗した場合は制御文字を処理してからJSON解析
-      
-      // ステップ1: JSONで明示的に許可されている制御文字以外をスペースに置換
-      // JSON仕様に基づき、\n \r \t のみを保持し、その他の制御文字はスペースに
-      const cleanedContent = contentStr
-        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ');
-        
-      try {
-        contentData = JSON.parse(cleanedContent);
-        console.log(`[DEBUG] クリーニング後のコンテンツをJSONとして解析成功`);
-      } catch (cleanError) {
-        // それでも失敗する場合、厳格な対応として全制御文字をスペースに置換
-        const strictCleanedContent = contentStr
-          .replace(/[\x00-\x1F\x7F-\x9F]/g, ' ');
-          
-        try {
-          contentData = JSON.parse(strictCleanedContent);
-          console.log(`[DEBUG] 厳格クリーニング後のコンテンツをJSONとして解析成功`);
-        } catch (strictError) {
-          // すべての方法が失敗した場合は、テキストそのものをコンテンツとして使用
-          console.log("[DEBUG] すべてのJSON解析方法が失敗しました。テキストをそのまま使用します。", initialError);
-          contentData = { content: contentStr };
-        }
-      }
-    }
+    // コンテンツをJSONとして解析する - safeJsonParseを使用
+    const contentData = safeJsonParse<Record<string, unknown>>(contentStr, { sections: [] });
     
     // Check if we have a valid sections array
     let sections = [];
@@ -294,7 +263,7 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
       
       // それでもセクションが見つからない場合、コンテンツ全体を1つのセクションとして扱う
       if (sections.length === 0) {
-        console.log(`[DEBUG] セクションが見つからないため、デフォルトセクションを作成します`);
+        console.log("[DEBUG] セクションが見つからないため、デフォルトセクションを作成します");
         sections = [
           {
             name: "概要",
@@ -379,14 +348,14 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
 /**
  * テキストから構造化されたセクションを抽出するヘルパー関数
  */
-function extractSectionsFromText(text: string, topic: string): Section[] {
-  console.log(`[DEBUG] テキストからセクションを抽出しています...`);
+function /* eslint-disable @typescript-eslint/no-unused-vars */ extractSectionsFromText/* eslint-enable @typescript-eslint/no-unused-vars */(text: string, topic: string): Section[] {
+  console.log("[DEBUG] テキストからセクションを抽出しています...");
   
   // セクションのヘッダーを検出するための正規表現
   const sectionHeaderRegex = /(?:^|\n)#+\s+(.+?)(?:\n|$)/g;
   const sections: Section[] = [];
   
-  let match;
+  let match: RegExpExecArray | null;
   while ((match = sectionHeaderRegex.exec(text)) !== null) {
     const sectionName = match[1].trim();
     // セクション名が有効な場合のみ追加
@@ -418,18 +387,18 @@ function extractSectionsFromText(text: string, topic: string): Section[] {
  */
 function humanFeedback(state: ReportState) {
   // Get sections
-  const topic = state.topic;
+  // const topic = state.topic;
   const sections = state.sections;
-  const sectionsStr = sections.map(
-    section => `Section: ${section.name}\nDescription: ${section.description}\nResearch needed: ${section.research ? 'Yes' : 'No'}`
-  ).join("\n\n");
+  // const sectionsStr = sections.map(
+  //   section => `Section: ${section.name}\nDescription: ${section.description}\nResearch needed: ${section.research ? 'Yes' : 'No'}`
+  // ).join("\n\n");
 
   console.log(`[DEBUG] フィードバック処理: セクション数=${sections.length}, フィードバック有無=${!!state.feedback_on_report_plan}`);
 
   // In the TypeScript version, we'll use a simpler approach since we don't have interactivity
   // We'll check if there's feedback; if so, regenerate the plan, otherwise proceed
   if (state.feedback_on_report_plan) {
-    console.log(`[DEBUG] フィードバックあり: プラン再生成へ遷移`);
+    console.log("[DEBUG] フィードバックあり: プラン再生成へ遷移");
     // Return to generate_report_plan with feedback
     return new Command({
       goto: "generate_report_plan",
@@ -437,25 +406,25 @@ function humanFeedback(state: ReportState) {
         feedback_on_report_plan: state.feedback_on_report_plan
       }
     });
-  } else {
-    // Proceed to process sections that need research
-    const researchSections = sections.filter(s => s.research);
-    console.log(`[DEBUG] 調査が必要なセクション数: ${researchSections.length}`);
-    
-    if (researchSections.length === 0) {
-      console.log(`[DEBUG] 調査が必要なセクションなし: セクション収集へ遷移`);
-      // If no sections need research, go straight to gathering sections
-      return new Command({
-        goto: "gather_completed_sections"
-      });
-    }
-    
-    console.log(`[DEBUG] セクション処理へ遷移`);
-    // Otherwise, start researching each section in sequence
+  }
+  
+  // Proceed to process sections that need research
+  const researchSections = sections.filter(s => s.research);
+  console.log(`[DEBUG] 調査が必要なセクション数: ${researchSections.length}`);
+  
+  if (researchSections.length === 0) {
+    console.log("[DEBUG] 調査が必要なセクションなし: セクション収集へ遷移");
+    // If no sections need research, go straight to gathering sections
     return new Command({
-      goto: "process_sections"
+      goto: "gather_completed_sections"
     });
   }
+  
+  console.log("[DEBUG] セクション処理へ遷移");
+  // Otherwise, start researching each section in sequence
+  return new Command({
+    goto: "process_sections"
+  });
 }
 
 /**
@@ -509,8 +478,8 @@ async function generateQueries(state: SectionState, config: RunnableConfig) {
     console.log(`[DEBUG] 生成されたクエリ内容: ${queriesText.substring(0, 200)}...`);
     
     try {
-      // 最適なフォーマットで解析を試みる
-      const queriesData = JSON.parse(queriesText);
+      // safeJsonParseを使用してJSONを解析
+      const queriesData = safeJsonParse<Record<string, unknown> | unknown[]>(queriesText, { queries: [] });
       
       // クエリの配列を見つける
       let queries = [];
@@ -529,7 +498,7 @@ async function generateQueries(state: SectionState, config: RunnableConfig) {
       }
       
       // 正規化
-      const normalizedQueries = queries.map((q: Record<string, unknown>) => {
+      const normalizedQueries = queries.map((q: Record<string, unknown> | string) => {
         if (typeof q === 'string') {
           return { search_query: q };
         }
@@ -542,7 +511,7 @@ async function generateQueries(state: SectionState, config: RunnableConfig) {
         }
         
         // プロパティがない場合はオブジェクト自体を使用
-        return { search_query: typeof q === 'string' ? q : JSON.stringify(q) };
+        return { search_query: typeof q === 'object' ? JSON.stringify(q) : String(q) };
       });
       
       console.log(`[DEBUG] 解析されたクエリ数: ${normalizedQueries.length}`);
@@ -561,7 +530,7 @@ async function generateQueries(state: SectionState, config: RunnableConfig) {
   }
   
   // デフォルトクエリの生成
-  console.log(`[DEBUG] デフォルトクエリを生成します`);
+  console.log("[DEBUG] デフォルトクエリを生成します");
   const defaultQueries = [
     { search_query: `${topic} ${section.name}` },
     { search_query: `${section.name} ${section.description}` },
@@ -605,7 +574,7 @@ async function searchWeb(state: SectionState, config: RunnableConfig) {
       // 各クエリの処理
       for (const queryObj of search_queries) {
         // クエリの取得
-        let query = queryObj.search_query;
+        const query = queryObj.search_query;
         
         // クエリが空の場合はスキップまたはデフォルトクエリを使用
         if (!query || query.trim() === '') {
@@ -631,7 +600,7 @@ async function searchWeb(state: SectionState, config: RunnableConfig) {
     } else {
       // クエリがない場合はデフォルトクエリを使用
       const defaultQuery = `${state.topic} ${state.section.name}`;
-      console.log(`[DEBUG] デフォルトクエリを生成します`);
+      console.log(`[DEBUG] デフォルトクエリを生成します: ${defaultQuery}`);
       
       // 検索API用の設定パラメータを取得
       const searchParams = getSearchParams(searchApi, configurable.searchApiConfig as SearchApiConfigOptions);
@@ -724,42 +693,11 @@ ${sourceText || "No sources provided. Generate content based on general knowledg
     : JSON.stringify(contentResult.content);
   
   console.log(`[DEBUG] セクション「${section.name}」の生成されたコンテンツ長: ${contentStr.length}文字`);
-  console.log(`[DEBUG] セクション「${section.name}」の生成されたコンテンツプレビュー:`, contentStr.substring(0, 200) + "...");
+  console.log(`[DEBUG] セクション「${section.name}」の生成されたコンテンツプレビュー: ${contentStr.substring(0, 200)}...`);
     
   try {
-    // コンテンツをJSONとして解析する
-    let contentData: Record<string, any>;
-    
-    // 制御文字を処理する前に、生データのままJSONとして解析を試みる
-    try {
-      contentData = JSON.parse(contentStr);
-      console.log(`[DEBUG] 元のコンテンツをJSONとして解析成功`);
-    } catch (initialError) {
-      // 失敗した場合は制御文字を処理してからJSON解析
-      
-      // ステップ1: JSONで明示的に許可されている制御文字以外をスペースに置換
-      // JSON仕様に基づき、\n \r \t のみを保持し、その他の制御文字はスペースに
-      const cleanedContent = contentStr
-        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, ' ');
-        
-      try {
-        contentData = JSON.parse(cleanedContent);
-        console.log(`[DEBUG] クリーニング後のコンテンツをJSONとして解析成功`);
-      } catch (cleanError) {
-        // それでも失敗する場合、厳格な対応として全制御文字をスペースに置換
-        const strictCleanedContent = contentStr
-          .replace(/[\x00-\x1F\x7F-\x9F]/g, ' ');
-          
-        try {
-          contentData = JSON.parse(strictCleanedContent);
-          console.log(`[DEBUG] 厳格クリーニング後のコンテンツをJSONとして解析成功`);
-        } catch (strictError) {
-          // すべての方法が失敗した場合は、テキストそのものをコンテンツとして使用
-          console.log("[DEBUG] すべてのJSON解析方法が失敗しました。テキストをそのまま使用します。", initialError);
-          contentData = { content: contentStr };
-        }
-      }
-    }
+    // コンテンツをsafeJsonParseで解析
+    const contentData = safeJsonParse<{ content: string }>(contentStr, { content: contentStr });
     
     // Update the section with the content
     const updatedSection = {
@@ -767,8 +705,8 @@ ${sourceText || "No sources provided. Generate content based on general knowledg
       content: contentData.content || contentStr,
     };
     
-    console.log(`[DEBUG] 更新されたセクションコンテンツ長: ${updatedSection.content.length}文字`);
-    console.log(`[DEBUG] 更新されたセクションコンテンツプレビュー:`, updatedSection.content.substring(0, 200) + "...");
+    console.log(`[DEBUG] 更新されたセクションコンテンツ長: ${(updatedSection.content as string).length}文字`);
+    console.log(`[DEBUG] 更新されたセクションコンテンツプレビュー: ${(updatedSection.content as string).substring(0, 200)}...`);
     
     // Get feedback on the section
     const feedbackSystemInstructions = sectionGraderInstructions.replace(
@@ -819,7 +757,7 @@ Respond with a JSON object with the following format:
       const jsonStr = jsonMatch ? jsonMatch[0] : feedbackStr;
       
       // 抽出したJSONを解析
-      const feedback: Feedback = JSON.parse(jsonStr);
+      const feedback = safeJsonParse<Feedback>(jsonStr, { grade: "fail", follow_up_queries: [] });
       console.log(`[DEBUG] セクション評価: grade=${feedback.grade}, フォローアップクエリ数=${feedback.follow_up_queries?.length || 0}`);
       
       // 進捗状況を通知
@@ -827,8 +765,8 @@ Respond with a JSON object with the following format:
       
       // If the section is passing or the max search depth is reached, publish the section
       if (feedback.grade === "pass" || state.search_iterations >= configurable.maxSearchDepth) {
-        console.log(`[DEBUG] セクション合格または最大検索深度到達: 完了へ遷移`);
-        console.log(`[DEBUG] 完了セクションに追加: "${updatedSection.name}", 内容長=${updatedSection.content.length}`);
+        console.log("[DEBUG] セクション合格または最大検索深度到達: 完了へ遷移");
+        console.log(`[DEBUG] 完了セクションに追加: "${updatedSection.name}", 内容長=${Object.keys(updatedSection.content).length}`);
         // 進捗状況を通知
         if (progressCallback) {
           await progressCallback(`セクション「${section.name}」は合格しました`);
@@ -841,25 +779,25 @@ Respond with a JSON object with the following format:
           },
           goto: END
         });
-      } else {
-        console.log(`[DEBUG] セクション不合格: さらなる調査が必要`);
-        // 進捗状況を通知
-        if (progressCallback) {
-          await progressCallback(`セクション「${section.name}」はさらなる調査が必要です`);
-        }
-        // Update the existing section with new content and update search queries
-        return new Command({
-          update: {
-            search_queries: feedback.follow_up_queries || [],
-            section: updatedSection
-          },
-          goto: "generate_queries"
-        });
       }
+      
+      console.log("[DEBUG] セクション不合格: さらなる調査が必要");
+      // 進捗状況を通知
+      if (progressCallback) {
+        await progressCallback(`セクション「${section.name}」はさらなる調査が必要です`);
+      }
+      // Update the existing section with new content and update search queries
+      return new Command({
+        update: {
+          search_queries: feedback.follow_up_queries || [],
+          section: updatedSection
+        },
+        goto: "generate_queries"
+      });
     } catch (error) {
       console.error("[DEBUG] フィードバックJSONの解析エラー:", error);
       // If we can't parse feedback, just complete the section
-      console.log(`[DEBUG] フィードバック解析エラーのため、セクションを完了とします: "${updatedSection.name}", 内容長=${updatedSection.content.length}`);
+      console.log(`[DEBUG] フィードバック解析エラーのため、セクションを完了とします: "${updatedSection.name}", 内容長=${Object.keys(updatedSection.content).length}`);
       return new Command({
         update: {
           section: updatedSection,
@@ -928,7 +866,7 @@ async function writeFinalSections(state: SectionState, config: RunnableConfig) {
     ? sectionContent.content
     : JSON.stringify(sectionContent.content);
 
-  console.log(`[DEBUG] 最終セクション「${section.name}」の生成されたコンテンツ長: ${contentStr.length}文字`);
+  console.log("[DEBUG] 最終セクション「" + section.name + "」の生成されたコンテンツ長: " + contentStr.length + "文字");
 
   // Write content to section
   const updatedSection: Section = {
@@ -944,9 +882,9 @@ async function writeFinalSections(state: SectionState, config: RunnableConfig) {
  * Process all sections in sequence.
  */
 async function processSections(state: ReportState, config?: RunnableConfig) {
-  console.log(`[DEBUG] セクション処理開始: 総セクション数=${state.sections.length}`);
+  console.log("[DEBUG] セクション処理開始: 総セクション数=" + state.sections.length);
   const completedSections: Section[] = [...state.completed_sections];
-  console.log(`[DEBUG] 既存の完了セクション数=${completedSections.length}`);
+  console.log("[DEBUG] 既存の完了セクション数=" + completedSections.length);
   
   // Get configuration
   const configurable = config ? Configuration.fromRunnableConfig(config) : new Configuration();
@@ -961,13 +899,13 @@ async function processSections(state: ReportState, config?: RunnableConfig) {
   for (const section of state.sections) {
     // 研究が必要ないセクションはスキップ
     if (!section.research) {
-      console.log(`[DEBUG] 研究不要セクションをスキップ: "${section.name}"`);
+      console.log("[DEBUG] 研究不要セクションをスキップ: \"" + section.name + "\"");
       continue;
     }
 
     // 既に完了しているセクションはスキップ
     if (completedSections.some(s => s.name === section.name && s.content)) {
-      console.log(`[DEBUG] 既に完了しているセクションをスキップ: "${section.name}"`);
+      console.log("[DEBUG] 既に完了しているセクションをスキップ: \"" + section.name + "\"");
       continue;
     }
 
@@ -976,25 +914,27 @@ async function processSections(state: ReportState, config?: RunnableConfig) {
       await progressCallback(`セクション「${section.name}」の調査を開始しています...`);
     }
 
-    console.log(`[DEBUG] セクション処理: "${section.name}"`);
+    console.log("[DEBUG] セクション処理: \"" + section.name + "\"");
     
     // セクション処理のための個別のグラフを作成
     try {
-      console.log(`[DEBUG] セクショングラフ作成: "${section.name}"`);
-      const sectionBuilder = new StateGraph<SectionState>({
+      console.log("[DEBUG] セクショングラフ作成: \"" + section.name + "\"");
+      const sectionBuilder = new StateGraph({
         channels: {
-          topic: {},
-          section: {},
-          search_queries: {},
+          topic: { value: (x: any, y: any) => y },
+          section: { value: (x: any, y: any) => y },
+          search_queries: { value: (x: any, y: any) => y },
           search_iterations: {
+            value: (x: any, y: any) => y,
             default: () => 0
           },
-          source_str: {},
+          source_str: { value: (x: any, y: any) => y },
           completed_sections: {
+            value: (x: any, y: any) => y,
             default: () => []
           },
-          report_sections_from_research: {},
-          grade_result: {}
+          report_sections_from_research: { value: (x: any, y: any) => y },
+          grade_result: { value: (x: any, y: any) => y }
         }
       });
 
@@ -1004,16 +944,16 @@ async function processSections(state: ReportState, config?: RunnableConfig) {
       sectionBuilder.addNode("write_section", writeSection);
 
       // エッジの追加
-      sectionBuilder.addEdge(START, "generate_queries");
-      sectionBuilder.addEdge("generate_queries", "search_web");
-      sectionBuilder.addEdge("search_web", "write_section");
+      sectionBuilder.addEdge("__start__", "generate_queries" as any);
+      sectionBuilder.addEdge("generate_queries" as any, "search_web" as any);
+      sectionBuilder.addEdge("search_web" as any, "write_section" as any);
 
       // サブグラフをコンパイル
-      console.log(`[DEBUG] セクショングラフコンパイル: "${section.name}"`);
+      console.log("[DEBUG] セクショングラフコンパイル: \"" + section.name + "\"");
       const compiledSectionGraph = sectionBuilder.compile();
 
       // 初期状態を設定
-      const initialSectionState: SectionState = {
+      const initialSectionState = {
         topic: state.topic,
         section,
         search_queries: [],
@@ -1024,44 +964,44 @@ async function processSections(state: ReportState, config?: RunnableConfig) {
       };
 
       // セクションのサブグラフを実行
-      console.log(`[DEBUG] セクショングラフ実行: "${section.name}"`);
+      console.log("[DEBUG] セクショングラフ実行: \"" + section.name + "\"");
       const sectionResult = await compiledSectionGraph.invoke(initialSectionState, config);
       
       // 完了したセクションを収集
-      console.log(`[DEBUG] セクショングラフ実行結果:`, JSON.stringify({
+      console.log("[DEBUG] セクショングラフ実行結果:", JSON.stringify({
         hasCompletedSections: !!sectionResult.completed_sections,
         completedSectionsLength: sectionResult.completed_sections ? sectionResult.completed_sections.length : 0,
         sectionName: sectionResult.section ? sectionResult.section.name : 'なし',
-        sectionContentLength: sectionResult.section && sectionResult.section.content ? sectionResult.section.content.length : 0
+        sectionContentLength: sectionResult.section?.content ? sectionResult.section.content.length : 0
       }, null, 2));
       
       // セクションの内容が生成されていれば、手動で完了セクションに追加
-      if (sectionResult.section && sectionResult.section.content) {
-        console.log(`[DEBUG] セクションの内容が見つかったため、完了セクションに追加: "${sectionResult.section.name}", 内容長=${sectionResult.section.content.length}`);
+      if (sectionResult.section?.content) {
+        console.log("[DEBUG] セクションの内容が見つかったため、完了セクションに追加: \"" + sectionResult.section.name + "\", 内容長=" + sectionResult.section.content.length);
         
         const existingIndex = completedSections.findIndex(s => s.name === sectionResult.section.name);
         if (existingIndex >= 0) {
-          console.log(`[DEBUG] 既存セクションを更新: "${sectionResult.section.name}"`);
+          console.log("[DEBUG] 既存セクションを更新: \"" + sectionResult.section.name + "\"");
           completedSections[existingIndex] = sectionResult.section;
         } else {
-          console.log(`[DEBUG] 新規セクションを追加: "${sectionResult.section.name}"`);
+          console.log("[DEBUG] 新規セクションを追加: \"" + sectionResult.section.name + "\"");
           completedSections.push(sectionResult.section);
         }
       }
       
       // completed_sectionsフィールドから追加のセクションを収集
       if (sectionResult.completed_sections && sectionResult.completed_sections.length > 0) {
-        console.log(`[DEBUG] 完了したセクション数: ${sectionResult.completed_sections.length}`);
+        console.log("[DEBUG] 完了したセクション数: " + sectionResult.completed_sections.length);
         // Add the sections to our completed list
         for (const completedSection of sectionResult.completed_sections) {
-          console.log(`[DEBUG] 完了セクションを処理: "${completedSection.name}", 内容長=${completedSection.content ? completedSection.content.length : 0}`);
+          console.log("[DEBUG] 完了セクションを処理: \"" + completedSection.name + "\", 内容長=" + (completedSection.content ? completedSection.content.length : 0));
           
           const existingIndex = completedSections.findIndex(s => s.name === completedSection.name);
           if (existingIndex >= 0) {
-            console.log(`[DEBUG] 既存セクションを更新: "${completedSection.name}"`);
+            console.log("[DEBUG] 既存セクションを更新: \"" + completedSection.name + "\"");
             completedSections[existingIndex] = completedSection;
           } else {
-            console.log(`[DEBUG] 新規セクションを追加: "${completedSection.name}"`);
+            console.log("[DEBUG] 新規セクションを追加: \"" + completedSection.name + "\"");
             completedSections.push(completedSection);
           }
         }
@@ -1071,10 +1011,10 @@ async function processSections(state: ReportState, config?: RunnableConfig) {
           await progressCallback(`セクション「${section.name}」の執筆を完了しました`);
         }
       } else {
-        console.log(`[DEBUG] 警告: セクション「${section.name}」は実行されましたが、完了セクションは生成されませんでした`);
+        console.log("[DEBUG] 警告: セクション「" + section.name + "」は実行されましたが、完了セクションは生成されませんでした");
       }
     } catch (error) {
-      console.error(`[DEBUG] セクション処理エラー "${section.name}":`, error);
+      console.error("[DEBUG] セクション処理エラー \"" + section.name + "\":", error);
       
       // エラー発生時も進捗状況を通知
       if (progressCallback) {
@@ -1082,7 +1022,7 @@ async function processSections(state: ReportState, config?: RunnableConfig) {
       }
       
       // エラーが発生しても、簡単な内容を持つセクションを作成して進める
-      console.log(`[DEBUG] エラーが発生したため、デフォルト内容のセクションを作成: "${section.name}"`);
+      console.log("[DEBUG] エラーが発生したため、デフォルト内容のセクションを作成: \"" + section.name + "\"");
       const defaultSection = {
         ...section,
         content: `${section.name}に関する情報の収集中にエラーが発生しました。`
@@ -1091,8 +1031,8 @@ async function processSections(state: ReportState, config?: RunnableConfig) {
     }
   }
 
-  console.log(`[DEBUG] 全セクション処理完了: 完了セクション数=${completedSections.length}`);
-  console.log(`[DEBUG] 完了セクション詳細:`, JSON.stringify(completedSections.map(s => ({ 
+  console.log("[DEBUG] 全セクション処理完了: 完了セクション数=" + completedSections.length);
+  console.log("[DEBUG] 完了セクション詳細:", JSON.stringify(completedSections.map(s => ({ 
     name: s.name, 
     contentLength: s.content ? s.content.length : 0,
     contentPreview: s.content ? s.content.substring(0, 50) + "..." : "内容なし"
@@ -1110,11 +1050,11 @@ async function processSections(state: ReportState, config?: RunnableConfig) {
  * Format completed sections as context for writing final sections.
  */
 function gatherCompletedSections(state: ReportState) {
-  console.log(`[DEBUG] 完了セクション収集: 完了セクション数=${state.completed_sections.length}`);
+  console.log("[DEBUG] 完了セクション収集: 完了セクション数=" + state.completed_sections.length);
   
   // Format completed section to str to use as context for final sections
   const completedReportSections = formatSections(state.completed_sections);
-  console.log(`[DEBUG] フォーマット済み完了セクション長: ${completedReportSections.length}文字`);
+  console.log("[DEBUG] フォーマット済み完了セクション長: " + completedReportSections.length + "文字");
 
   return { report_sections_from_research: completedReportSections };
 }
@@ -1152,33 +1092,33 @@ function compileFinalReport(state: ReportState) {
   
   // Get sections
   const sections = state.sections;
-  console.log(`[DEBUG] セクション数: ${sections.length}`);
-  console.log(`[DEBUG] セクション詳細:`, JSON.stringify(sections.map(s => ({ name: s.name, contentLength: s.content ? s.content.length : 0 })), null, 2));
+  console.log("[DEBUG] セクション数: " + sections.length);
+  console.log("[DEBUG] セクション詳細:", JSON.stringify(sections.map(s => ({ name: s.name, contentLength: s.content ? s.content.length : 0 })), null, 2));
   
   const completedSections = state.completed_sections.reduce((map, section) => {
     map[section.name] = section.content;
     return map;
   }, {} as Record<string, string>);
   
-  console.log(`[DEBUG] 完了セクション数: ${state.completed_sections.length}`);
-  console.log(`[DEBUG] 完了セクション詳細:`, JSON.stringify(state.completed_sections.map(s => ({ name: s.name, contentLength: s.content ? s.content.length : 0 })), null, 2));
-  console.log(`[DEBUG] 完了セクションのマップ:`, JSON.stringify(Object.keys(completedSections), null, 2));
+  console.log("[DEBUG] 完了セクション数: " + state.completed_sections.length);
+  console.log("[DEBUG] 完了セクション詳細:", JSON.stringify(state.completed_sections.map(s => ({ name: s.name, contentLength: s.content ? s.content.length : 0 })), null, 2));
+  console.log("[DEBUG] 完了セクションのマップ:", JSON.stringify(Object.keys(completedSections), null, 2));
 
   // Update sections with completed content while maintaining original order
   const updatedSections = sections.map(section => {
     const hasContent = completedSections[section.name] !== undefined;
-    console.log(`[DEBUG] セクション「${section.name}」の更新: 内容あり=${hasContent}, 内容長=${hasContent ? completedSections[section.name].length : 0}`);
+    console.log("[DEBUG] セクション「" + section.name + "」の更新: 内容あり=" + hasContent + ", 内容長=" + (hasContent ? completedSections[section.name].length : 0));
     return {
       ...section,
       content: completedSections[section.name] || "Content not available",
     };
   });
 
-  console.log(`[DEBUG] 更新後のセクション詳細:`, JSON.stringify(updatedSections.map(s => ({ name: s.name, contentLength: s.content ? s.content.length : 0, contentPreview: s.content.substring(0, 50) })), null, 2));
+  console.log("[DEBUG] 更新後のセクション詳細:", JSON.stringify(updatedSections.map(s => ({ name: s.name, contentLength: s.content ? s.content.length : 0, contentPreview: s.content.substring(0, 50) })), null, 2));
 
   // Compile final report
   const allSections = updatedSections.map(s => `# ${s.name}\n\n${s.content}`).join("\n\n");
-  console.log(`[DEBUG] 最終レポート長: ${allSections.length}`);
+  console.log("[DEBUG] 最終レポート長: " + allSections.length);
 
   return { final_report: allSections };
 }
@@ -1188,16 +1128,17 @@ function compileFinalReport(state: ReportState) {
  */
 export function buildReportGraph() {
   // Create the main report graph
-  const builder = new StateGraph<ReportState>({
+  const builder = new StateGraph({
     channels: {
-      topic: {},
-      feedback_on_report_plan: {},
-      sections: {},
+      topic: { value: (x: any, y: any) => y },
+      feedback_on_report_plan: { value: (x: any, y: any) => y },
+      sections: { value: (x: any, y: any) => y },
       completed_sections: {
+        value: (x: any, y: any) => y,
         default: () => []
       },
-      report_sections_from_research: {},
-      final_report: {}
+      report_sections_from_research: { value: (x: any, y: any) => y },
+      final_report: { value: (x: any, y: any) => y }
     }
   });
 
@@ -1210,20 +1151,20 @@ export function buildReportGraph() {
   builder.addNode("compile_final_report", compileFinalReport);
 
   // Add edges
-  builder.addEdge(START, "generate_report_plan");
-  builder.addEdge("generate_report_plan", "human_feedback");
-  builder.addEdge("human_feedback", "process_sections");
-  builder.addEdge("process_sections", "gather_completed_sections");
+  builder.addEdge("__start__", "generate_report_plan" as any);
+  builder.addEdge("generate_report_plan" as any, "human_feedback" as any);
+  builder.addEdge("human_feedback" as any, "process_sections" as any);
+  builder.addEdge("process_sections" as any, "gather_completed_sections" as any);
   builder.addConditionalEdges(
-    "gather_completed_sections",
+    "gather_completed_sections" as any,
     initiateFinalSectionWriting,
     {
       "write_final_sections": "write_final_sections",
       "compile_final_report": "compile_final_report"
     }
   );
-  builder.addEdge("write_final_sections", "compile_final_report");
-  builder.addEdge("compile_final_report", END);
+  builder.addEdge("write_final_sections" as any, "compile_final_report" as any);
+  builder.addEdge("compile_final_report" as any, "__end__" as any);
 
   return builder.compile();
 }
@@ -1241,7 +1182,7 @@ export async function executeReport(topic: string, config?: RunnableConfig): Pro
   const progressCallback = configurable.progressCallback;
   
   // Prepare initial state
-  const initialState: ReportState = {
+  const initialState = {
     topic,
     feedback_on_report_plan: "",
     sections: [],
@@ -1268,7 +1209,7 @@ export async function executeReport(topic: string, config?: RunnableConfig): Pro
       console.log("完了したセクション数:", result.completed_sections ? result.completed_sections.length : 0);
       
       if (result.sections && result.sections.length > 0) {
-        result.sections.forEach((section, index) => {
+        result.sections.forEach((section: Section, index: number) => {
           console.log(`セクション ${index + 1}:`, {
             name: section.name,
             contentLength: section.content ? section.content.length : 0,
