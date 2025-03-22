@@ -3,7 +3,7 @@ import type { Conversation } from "@/lib/storage";
 import { deleteConversation, getConversations } from "@/lib/storage";
 import { formatDistanceToNow } from "date-fns";
 import { ja } from "date-fns/locale";
-import { Home, Info, MessageSquare, Plus, Trash2 } from "lucide-react";
+import { FileText, Home, Info, MessageSquare, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -79,6 +79,8 @@ export function ConversationList({ closeMenu }: ConversationListProps) {
       router.push('/chat');
     } else if (path === '/about') {
       router.push('/about');
+    } else if (path === '/deep-research') {
+      router.push('/deep-research');
     } else {
       // 他のパスは未実装
       alert('このページは準備中です');
@@ -100,14 +102,28 @@ export function ConversationList({ closeMenu }: ConversationListProps) {
           ホーム
         </Button>
 
-        <Button
-          variant={pathname === '/chat' && !pathname.includes('/chat/') ? "secondary" : "ghost"}
-          className="w-full justify-start gap-2"
-          onClick={() => handleNavigation('/chat')}
-        >
-          <MessageSquare className="h-4 w-4" />
-          新しい会話
-        </Button>
+        {/* Deep Research - 区切り線とスペースを追加して目立たせる */}
+        <div className="my-3 border-t pt-3">
+          <Button
+            variant={pathname === '/deep-research' ? "secondary" : "default"}
+            className="w-full justify-start gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-md hover:shadow-lg transition-all py-5"
+            onClick={() => handleNavigation('/deep-research')}
+          >
+            <FileText className="h-5 w-5" />
+            <span className="font-semibold">ディープリサーチ</span>
+          </Button>
+        </div>
+
+        <div className="my-2 border-t pt-2">
+          <Button
+            variant={pathname === '/chat' && !pathname.includes('/chat/') ? "secondary" : "ghost"}
+            className="w-full justify-start gap-2"
+            onClick={() => handleNavigation('/chat')}
+          >
+            <MessageSquare className="h-4 w-4" />
+            新しい会話
+          </Button>
+        </div>
 
         <Button
           variant={pathname === '/about' ? "secondary" : "ghost"}

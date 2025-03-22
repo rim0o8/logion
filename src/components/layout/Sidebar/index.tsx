@@ -9,7 +9,7 @@ import {
     SheetTrigger
 } from "@/components/ui/sheet";
 
-import { Menu, Search, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ConversationList } from "./ConversationList";
@@ -63,17 +63,6 @@ export const Sidebar: React.FC = () => {
                 <div className="flex-1 overflow-y-auto py-2">
                     <ConversationList closeMenu={() => setOpen(false)} />
                     <div className="mt-4 px-4 space-y-2">
-                        <Button 
-                            variant="outline"
-                            className="w-full flex items-center gap-2"
-                            onClick={() => {
-                                setOpen(false);
-                                router.push("/deep-research");
-                            }}
-                        >
-                            <Search className="h-4 w-4" />
-                            <span>ディープリサーチ</span>
-                        </Button>
                         <Button 
                             variant="outline"
                             className="w-full"
