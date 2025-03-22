@@ -4,7 +4,7 @@ import { PromptTemplate } from "@langchain/core/prompts";
 import { RunnableSequence } from "@langchain/core/runnables";
 import type { StateGraph } from "@langchain/langgraph";
 import { initChatModel } from "./models";
-import { sectionWriterInputs, sectionWriterInstructions } from "./prompts";
+import { sectionWriterInstructions } from "./prompts";
 import type { Section } from "./state";
 import { safeJsonParse } from "./textUtils";
 
@@ -13,10 +13,6 @@ import { safeJsonParse } from "./textUtils";
  */
 const SECTION_WRITING_TEMPLATE = sectionWriterInstructions;
 
-/**
- * 入力形式の生成用テンプレート
- */
-const SECTION_INPUTS_TEMPLATE = sectionWriterInputs;
 
 /**
  * JSONコンテンツから実際のセクション内容を抽出する
