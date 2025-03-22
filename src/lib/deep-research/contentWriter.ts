@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import { JsonOutputParser, StringOutputParser } from "@langchain/core/output_parsers";
+import { StringOutputParser } from "@langchain/core/output_parsers";
 import { PromptTemplate } from "@langchain/core/prompts";
 import { RunnableSequence } from "@langchain/core/runnables";
 import type { StateGraph } from "@langchain/langgraph";
@@ -87,25 +87,34 @@ interface SectionContent {
 
 /**
  * 型安全なセクション執筆用のチェーンを作成する
- * JsonOutputParserを使用して型指定された出力を得る
  * 
  * @param model - 使用するチャットモデル
- * @returns 型安全なセクション執筆のためのチェーン
+ * @returns セクション執筆のためのチェーン
  */
 export function createTypedWriterChain(model: BaseChatModel) {
-  // JSONパーサーを作成
-  const parser = new JsonOutputParser<SectionContent>();
+  // パーサーを作成
+  const parser = new StringOutputParser();
 
-  // プロンプトテンプレートを作成し、フォーマット指示を含める
-  const writerPrompt = PromptTemplate.fromTemplate(
-    SECTION_WRITING_TEMPLATE
-  );
+  // プロンプトテンプレートを作成
+  const writerPrompt = PromptTemplate.fromTemplate(SECTION_WRITING_TEMPLATE);
 
   // チェーンを作成
   return RunnableSequence.from([
-    writerPrompt,
-    model,
-    new StringOutputParser()
+    // 入力を整形
+    (input: Record<string, unknown>) => {
+      return {
+        topic: input.topic,
+        sectionName: input.sectionName,
+        sectionDescription: input.sectionDescription,
+        searchResults: input.searchResults || []
+      };
+    },
+    // 整形した入力をプロンプトに渡す
+    (formattedInput) => writerPrompt.invoke(formattedInput),
+    // プロンプトの出力をモデルに渡す
+    (promptOutput) => model.invoke(promptOutput),
+    // 最終的な文字列出力としてパース
+    (modelOutput) => parser.invoke(modelOutput)
   ]);
 }
 
@@ -148,12 +157,10 @@ export async function processSection(state: SectionProcessState, sectionKeyName 
     // チェーンを実行してコンテンツを生成
     console.log(`[DEBUG] セクション '${currentSection.name}' のコンテンツを生成中...`);
     const content = await chain.invoke({
-      inputs: {
-        topic: state.topic,
-        sectionName: currentSection.name,
-        sectionDescription: currentSection.description,
-        searchResults: state.searchResults || [],
-      },
+      topic: state.topic,
+      sectionName: currentSection.name,
+      sectionDescription: currentSection.description,
+      searchResults: state.searchResults || [],
     });
     
     console.log('[DEBUG] セクションのコンテンツが生成されました');
