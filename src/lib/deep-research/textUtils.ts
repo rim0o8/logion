@@ -47,31 +47,121 @@ export function safeJsonParse<T>(contentStr: string): T | null {
   const extractJsonContent = (input: string): string => {
     console.log("[DEBUG] 生成AI出力からのJSON抽出を試みます");
     
-    // オブジェクト形式のJSONを検出して抽出
-    if (input.includes('{') && input.includes('}')) {
-      const startIdx = input.indexOf('{');
-      const endIdx = input.lastIndexOf('}');
+    // 入力文字列をログに記録（デバッグ用）
+    console.log(`[DEBUG] 入力文字列のプレビュー: ${input.substring(0, 100)}...`);
+    console.log(`[DEBUG] 入力文字列の長さ: ${input.length}文字`);
+    
+    // バランスの取れた括弧を探す関数
+    const findBalancedBrackets = (text: string, startIdx: number, openChar: string, closeChar: string): [number, number] | null => {
+      let depth = 0;
       
-      if (startIdx !== -1 && endIdx > startIdx) {
-        const extracted = input.substring(startIdx, endIdx + 1);
-        console.log(`[DEBUG] JSONオブジェクトを抽出しました: ${extracted.length}文字`);
+      for (let i = startIdx; i < text.length; i++) {
+        if (text[i] === openChar) {
+          depth++;
+        } else if (text[i] === closeChar) {
+          depth--;
+          if (depth === 0) {
+            return [startIdx, i];
+          }
+          if (depth < 0) {
+            // 不正な形式: 閉じ括弧が多すぎる
+            return null;
+          }
+        }
+      }
+      
+      return null; // バランスの取れた括弧のペアが見つからない
+    };
+    
+    // 最初に出現するJSONの括弧（{または[）を見つける
+    const firstObjectStartIdx = input.indexOf('{');
+    const firstArrayStartIdx = input.indexOf('[');
+    
+    // 両方見つからない場合は入力文字列をそのまま返す
+    if (firstObjectStartIdx === -1 && firstArrayStartIdx === -1) {
+      console.log("[DEBUG] JSON構造が見つかりませんでした");
+      return input;
+    }
+    
+    // 最初に現れる括弧の種類と位置を特定
+    let bracketType: '{' | '[' = '{';
+    let startPos = firstObjectStartIdx;
+    
+    // 配列の方が先に出現する場合、または{}が見つからない場合
+    if ((firstArrayStartIdx !== -1 && (firstObjectStartIdx === -1 || firstArrayStartIdx < firstObjectStartIdx))) {
+      bracketType = '[';
+      startPos = firstArrayStartIdx;
+    }
+    
+    console.log(`[DEBUG] 最初に検出した括弧: ${bracketType} 位置: ${startPos}`);
+    
+    // 対応する閉じ括弧を見つけて抽出
+    const closeBracket = bracketType === '{' ? '}' : ']';
+    const result = findBalancedBrackets(input, startPos, bracketType, closeBracket);
+    
+    if (result) {
+      const [start, end] = result;
+      const extracted = input.substring(start, end + 1);
+      console.log(`[DEBUG] JSON構造を抽出しました: ${extracted.length}文字 (位置 ${start}~${end})`);
+      
+      try {
+        // 抽出した部分が有効なJSONかチェック
+        JSON.parse(extracted);
         return extracted;
+      } catch (e) {
+        console.log(`[DEBUG] 抽出した構造は有効なJSONではありません: ${(e as Error).message}`);
       }
     }
     
-    // 配列形式のJSONを検出して抽出
-    if (input.includes('[') && input.includes(']')) {
-      const startIdx = input.indexOf('[');
+    // バランスの取れた括弧が見つからなかった場合や解析に失敗した場合のフォールバック
+    // 単純に最初の開き括弧から最後の閉じ括弧までを抽出
+    if (bracketType === '[' && input.includes(']')) {
       const endIdx = input.lastIndexOf(']');
-      
-      if (startIdx !== -1 && endIdx > startIdx) {
-        const extracted = input.substring(startIdx, endIdx + 1);
-        console.log(`[DEBUG] JSON配列を抽出しました: ${extracted.length}文字`);
-        return extracted;
+      if (endIdx > startPos) {
+        const extracted = input.substring(startPos, endIdx + 1);
+        console.log(`[DEBUG] 単純な方法でJSON配列を抽出しました: ${extracted.length}文字`);
+        try {
+          JSON.parse(extracted);
+          return extracted;
+        } catch (e) {
+          console.log(`[DEBUG] 単純抽出した配列の解析に失敗: ${(e as Error).message}`);
+        }
+      }
+    } else if (bracketType === '{' && input.includes('}')) {
+      const endIdx = input.lastIndexOf('}');
+      if (endIdx > startPos) {
+        const extracted = input.substring(startPos, endIdx + 1);
+        console.log(`[DEBUG] 単純な方法でJSONオブジェクトを抽出しました: ${extracted.length}文字`);
+        try {
+          JSON.parse(extracted);
+          return extracted;
+        } catch (e) {
+          console.log(`[DEBUG] 単純抽出したオブジェクトの解析に失敗: ${(e as Error).message}`);
+        }
+      }
+    }
+    
+    // 上記の方法がすべて失敗した場合は、もう一方の括弧タイプも試す
+    const alternativeBracket = bracketType === '{' ? '[' : '{';
+    const alternativeClose = alternativeBracket === '{' ? '}' : ']';
+    const alternativeStartPos = alternativeBracket === '{' ? firstObjectStartIdx : firstArrayStartIdx;
+    
+    if (alternativeStartPos !== -1 && input.includes(alternativeClose)) {
+      const alternativeEndPos = input.lastIndexOf(alternativeClose);
+      if (alternativeEndPos > alternativeStartPos) {
+        const extracted = input.substring(alternativeStartPos, alternativeEndPos + 1);
+        console.log(`[DEBUG] 代替方法でJSON構造を抽出しました: ${extracted.length}文字`);
+        try {
+          JSON.parse(extracted);
+          return extracted;
+        } catch (e) {
+          console.log(`[DEBUG] 代替抽出の解析に失敗: ${(e as Error).message}`);
+        }
       }
     }
     
     // 抽出できなかった場合は元の文字列を返す
+    console.log("[DEBUG] JSONの抽出に失敗しました。元の文字列を返します");
     return input;
   };
   
