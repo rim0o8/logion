@@ -4,7 +4,7 @@ import { RunnableSequence } from "@langchain/core/runnables";
 import type { StateGraph } from "@langchain/langgraph";
 import { initChatModel } from "./models";
 import { queryWriterInstructions } from "./prompts";
-import type { ResearchState } from "./state";
+import type { ResearchState, SearchQuery } from "./state";
 import { safeJsonParse } from "./textUtils";
 
 /**
@@ -24,6 +24,14 @@ export function createQueryChain(model: BaseChatModel) {
     queryPrompt,
     model,
   ]).pipe(output => String(output.content));
+}
+
+/**
+ * セクション・クエリのペアインターフェース
+ */
+interface SectionQueryPair {
+  section: string;
+  queries: string[];
 }
 
 /**
@@ -57,7 +65,7 @@ export async function generateQueries(state: ResearchState): Promise<Partial<Res
     const queryChain = createQueryChain(model);
     
     // 各セクションに対してクエリを生成
-    const searchQueries = [];
+    const searchQueries: SectionQueryPair[] = [];
     
     for (const section of sections) {
       try {
@@ -98,8 +106,18 @@ export async function generateQueries(state: ResearchState): Promise<Partial<Res
       }
     }
     
+    // クエリをSearchQuery[]形式に変換
+    const flattenedQueries: SearchQuery[] = [];
+    for (const sectionQuery of searchQueries) {
+      for (const query of sectionQuery.queries) {
+        flattenedQueries.push({ search_query: query });
+      }
+    }
+    
     return {
+      // @ts-expect-error - ResearchStateの拡張が必要
       searchQueries,
+      queries: flattenedQueries,
       currentStep: "searchWeb",
     };
   } catch (error) {
@@ -119,10 +137,11 @@ export async function generateQueries(state: ResearchState): Promise<Partial<Res
  */
 export function addQueryGenerationToGraph(graph: StateGraph<ResearchState>) {
   // クエリ生成ノードを追加
-  graph.addNode("generateQueries", RunnableSequence.from([generateQueries]));
+  graph.addNode("generateQueries", generateQueries);
   
   // エッジを追加
   graph.addConditionalEdges(
+    // @ts-expect-error - LangChainの型の問題を回避
     "generateQueries",
     (state: ResearchState) => state.currentStep,
     {

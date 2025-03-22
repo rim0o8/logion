@@ -148,14 +148,18 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
     if (queries.length > 0) {
       if (typeof queries[0] === 'string') {
         // 文字列の配列の場合
-        queries = queries.map((q: string) => ({ search_query: q }));
+        queries = queries.map((q) => {
+          const queryStr = q as string;
+          return { search_query: queryStr };
+        });
       } else if (typeof queries[0] === 'object') {
         // オブジェクトの配列の場合、有効なフィールド名を探す
         const validFields = ['search_query', 'searchQuery', 'query', 'text', 'q'];
-        queries = queries.map((item: Record<string, unknown>) => {
+        queries = queries.map((item) => {
+          const queryObj = item as Record<string, unknown>;
           for (const field of validFields) {
-            if (item[field]) {
-              return { search_query: item[field] as string };
+            if (queryObj[field]) {
+              return { search_query: queryObj[field] as string };
             }
           }
           // フィールドが見つからない場合、オブジェクト自体を文字列化
@@ -184,7 +188,10 @@ async function generateReportPlan(state: ReportState, config: RunnableConfig) {
   }
 
   // Execute search for each query
-  const queryList = queries.map(q => q.search_query).filter(Boolean);
+  const queryList = queries.map(q => {
+    const queryObj = q as { search_query: string };
+    return queryObj.search_query;
+  }).filter(Boolean);
   
   // 進捗状況を通知
   if (progressCallback) {

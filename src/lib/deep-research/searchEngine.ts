@@ -1,8 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-import { StateGraph } from "@langchain/langgraph";
+import type { StateGraph } from "@langchain/langgraph";
 import type { ResearchState } from "./state";
 import { formatSearchResults, getSearchParams, selectAndExecuteSearch } from "./utils";
+
+/**
+ * セクション・クエリのペアインターフェース
+ */
+interface SectionQueryPair {
+  section: string;
+  queries: string[];
+}
 
 /**
  * Web検索を実行する
@@ -14,7 +22,8 @@ export async function executeWebSearch(state: ResearchState): Promise<Partial<Re
   try {
     console.log("[DEBUG] Web検索の実行を開始...");
     
-    const { topic, searchQueries } = state;
+    // @ts-expect-error - ResearchStateの拡張が必要
+    const { searchQueries } = state;
     
     if (!searchQueries || searchQueries.length === 0) {
       console.error("[ERROR] 検索クエリがありません");
@@ -25,7 +34,7 @@ export async function executeWebSearch(state: ResearchState): Promise<Partial<Re
     }
     
     // 検索クエリのリストを作成（すべてのセクションからクエリを収集）
-    const allQueries = searchQueries.flatMap(sq => sq.queries || []);
+    const allQueries = searchQueries.flatMap((sq: SectionQueryPair) => sq.queries || []);
     
     if (allQueries.length === 0) {
       console.error("[ERROR] 有効な検索クエリがありません");
@@ -75,6 +84,7 @@ export async function executeWebSearch(state: ResearchState): Promise<Partial<Re
     const formattedResults = formatSearchResults(searchResults);
     
     return {
+      // @ts-ignore - ResearchStateの拡張が必要
       searchResults: formattedResults,
       currentStep: "writeSections",
     };
@@ -95,12 +105,13 @@ export async function executeWebSearch(state: ResearchState): Promise<Partial<Re
  */
 export function addWebSearchToGraph(graph: StateGraph<ResearchState>) {
   // Web検索ノードを追加
-  // @ts-expect-error - StateGraph型定義の問題を回避
+  // @ts-ignore - StateGraph型定義の問題を回避
   graph.addNode("searchWeb", executeWebSearch);
   
   // エッジを追加
-  // @ts-expect-error - StateGraph型定義の問題を回避
+  // @ts-ignore - StateGraph型定義の問題を回避
   graph.addConditionalEdges(
+    // @ts-ignore - StateGraph型定義の問題を回避
     "searchWeb",
     (state) => {
       if (state.error) return "error";

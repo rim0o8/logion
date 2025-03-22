@@ -1,11 +1,10 @@
 import { runResearch } from "./buildGraph";
-import type { ResearchState, SearchResult, Section } from "./state";
+import type { ResearchState, Section } from "./state";
 import { formatCompletedSections } from "./textUtils";
 
 export type {
-    ResearchState,
-    SearchResult,
-    Section
+  ResearchState,
+  Section
 };
 
 /**

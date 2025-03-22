@@ -1,18 +1,33 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import { JsonOutputParser } from "@langchain/core/output_parsers";
+import { JsonOutputParser, StringOutputParser } from "@langchain/core/output_parsers";
 import { PromptTemplate } from "@langchain/core/prompts";
 import { RunnableSequence } from "@langchain/core/runnables";
 import type { StateGraph } from "@langchain/langgraph";
 import { initChatModel } from "./models";
 import { sectionWriterInstructions } from "./prompts";
-import type { Section } from "./state";
+import type { ResearchState, Section } from "./state";
 import { safeJsonParse } from "./textUtils";
+
+/**
+ * セクション処理の状態インターフェース
+ */
+interface SectionProcessState {
+  topic: string;
+  section: Section;
+  completedSections?: Section[];
+  searchResults?: Record<string, unknown>[];
+  writeModel?: string;
+  writeModelProvider?: string;
+  planModel?: string;
+  planModelProvider?: string;
+  [key: string]: unknown;
+}
 
 /**
  * セクション執筆のプロンプトテンプレート
  */
 const SECTION_WRITING_TEMPLATE = sectionWriterInstructions;
-
 
 /**
  * JSONコンテンツから実際のセクション内容を抽出する
@@ -83,99 +98,105 @@ export function createTypedWriterChain(model: BaseChatModel) {
 
   // プロンプトテンプレートを作成し、フォーマット指示を含める
   const writerPrompt = PromptTemplate.fromTemplate(
-    `${SECTION_WRITING_TEMPLATE}\n\n{format_instructions}`
+    SECTION_WRITING_TEMPLATE
   );
 
   // チェーンを作成
   return RunnableSequence.from([
-    {
-      // 入力変数をマップ
-      prompt: (input: any) => input,
-      format_instructions: () => parser.getFormatInstructions(),
-    },
     writerPrompt,
     model,
-    parser, // JSONパーサーを通して出力を処理
-  ]).pipe(output => {
-    // パース済みの結果からコンテンツを取得
-    console.log(`[DEBUG] 型安全なチェーンから構造化された出力を取得: ${output.content.length}文字`);
-    return output.content;
-  });
+    new StringOutputParser()
+  ]);
 }
 
 /**
- * セクション状態のステップを処理する
+ * セクションの処理を行う
  * 
- * @param state - 現在のセクション状態
- * @param sectionKeyName - セクションのキー名
- * @returns 更新されたセクション状態
+ * @param state - セクション処理の状態
+ * @param sectionKeyName - セクションのキー名（デフォルトは'section'）
+ * @returns 更新された状態
  */
-export async function processSection(state: any, sectionKeyName: string = 'section') {
+export async function processSection(state: SectionProcessState, sectionKeyName = 'section') {
   try {
-    console.log(`[DEBUG] processSection: セクション '${state[sectionKeyName].name}' の処理を開始`);
+    const currentSection = state[sectionKeyName] as Section;
     
-    // セクションがすでに完了しているか確認
-    const isAlreadyCompleted = state.completed_sections && 
-                               state.completed_sections.some((s: Section) => 
-                                 s.name.toLowerCase() === state[sectionKeyName].name.toLowerCase() && s.content);
+    if (!currentSection) {
+      console.error('[ERROR] セクションが見つかりません');
+      return {
+        ...state,
+        error: 'セクションが見つかりません'
+      };
+    }
+    
+    console.log(`[DEBUG] セクション '${currentSection.name}' の処理を開始します...`);
+    
+    // すでに完了したセクションかどうかをチェック
+    const isAlreadyCompleted = state.completedSections?.some(
+      s => s.name.toLowerCase() === currentSection.name.toLowerCase() && s.content);
     
     if (isAlreadyCompleted) {
-      console.log(`[DEBUG] セクション '${state[sectionKeyName].name}' はすでに完了しています。スキップします。`);
+      console.log(`[DEBUG] セクション '${currentSection.name}' はすでに完了しています。スキップします。`);
       return state;
     }
     
-    // モデルを初期化
-    const model = initChatModel();
+    // モデルを初期化（デフォルトモデルを使用）
+    const model = initChatModel(state.writeModel as string, state.writeModelProvider as string);
     
     // セクション執筆用のチェーンを作成（型安全なバージョンを使用）
     const chain = createTypedWriterChain(model);
     
     // チェーンを実行してコンテンツを生成
-    console.log(`[DEBUG] セクション '${state[sectionKeyName].name}' のコンテンツを生成中...`);
+    console.log(`[DEBUG] セクション '${currentSection.name}' のコンテンツを生成中...`);
     const content = await chain.invoke({
-      topic: state.topic,
-      section_name: state[sectionKeyName].name,
-      section_description: state[sectionKeyName].description,
-      source_str: state.source_str || "",
-      report_sections_from_research: state.report_sections_from_research || "",
+      inputs: {
+        topic: state.topic,
+        sectionName: currentSection.name,
+        sectionDescription: currentSection.description,
+        searchResults: state.searchResults || [],
+      },
     });
     
-    // 新しいセクション状態を作成
-    const updatedSection = {
-      ...state[sectionKeyName],
-      content: content,
+    console.log('[DEBUG] セクションのコンテンツが生成されました');
+    
+    // 完了したセクションを準備
+    const completedSection = {
+      ...currentSection,
+      content: extractContentFromResponse(content),
     };
     
-    // 完了したセクションの配列を更新
-    let updatedCompletedSections = [...(state.completed_sections || [])];
+    // 完了したセクションの配列を追加または更新
+    const completedSections = [...(state.completedSections || [])];
     
-    // 既存の完了セクションを探す
-    const existingIndex = updatedCompletedSections.findIndex(
-      (s: Section) => s.name.toLowerCase() === updatedSection.name.toLowerCase()
-    );
+    // すでにリストにあるかどうかをチェック
+    const existingIndex = completedSections.findIndex(
+      s => s.name.toLowerCase() === completedSection.name.toLowerCase());
     
     if (existingIndex >= 0) {
       // 既存のセクションを更新
-      updatedCompletedSections[existingIndex] = updatedSection;
+      completedSections[existingIndex] = completedSection;
     } else {
       // 新しいセクションを追加
-      updatedCompletedSections.push(updatedSection);
+      completedSections.push(completedSection);
     }
     
     // 更新された状態を返す
+    const updatedState = {
+      ...state,
+      completed_sections: completedSections,
+    };
+    
+    return updatedState;
+  } catch (error) {
+    console.error('[ERROR] セクション処理中にエラーが発生しました:', error);
     return {
       ...state,
-      [sectionKeyName]: updatedSection,
-      completed_sections: updatedCompletedSections,
+      error: `セクション処理中にエラーが発生しました: ${error instanceof Error ? error.message : String(error)}`,
     };
-  } catch (error) {
-    console.error("[ERROR] セクション処理中にエラーが発生しました:", error);
-    throw error;
   }
 }
 
 /**
- * LangGraphでの状態グラフにコンテンツライターノードを追加する
+ * 状態グラフにコンテンツ執筆ステップを追加する
  * 
  * @param graph - 状態グラフ
  * @param inputStateKeyName - 入力状態のキー名
@@ -183,10 +204,10 @@ export async function processSection(state: any, sectionKeyName: string = 'secti
  * @returns 更新された状態グラフ
  */
 export function addContentWriterToGraph(
-  graph: StateGraph<any>,
-  inputStateKeyName: string = 'section_state',
-  sectionKeyName: string = 'section'
+  graph: StateGraph<ResearchState | SectionProcessState>,
+  inputStateKeyName = 'section_state',
+  sectionKeyName = 'section'
 ) {
-  graph.addNode(inputStateKeyName, async (state) => await processSection(state, sectionKeyName));
+  graph.addNode(inputStateKeyName, async (state: SectionProcessState) => await processSection(state, sectionKeyName));
   return graph;
 } 

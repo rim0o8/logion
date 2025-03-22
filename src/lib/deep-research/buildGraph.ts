@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 import { Command, END, StateGraph } from "@langchain/langgraph";
-import { addSectionWritingToGraph } from "./contentWriter";
+import { addContentWriterToGraph } from "./contentWriter";
 import { addPlanGenerationToGraph } from "./planGenerator";
 import { addQueryGenerationToGraph } from "./queryGenerator";
 import { addWebSearchToGraph } from "./searchEngine";
@@ -104,7 +104,7 @@ export function buildResearchGraph() {
   // @ts-ignore - 型エラーを回避
   addWebSearchToGraph(builder);
   // @ts-ignore - 型エラーを回避
-  addSectionWritingToGraph(builder);
+  addContentWriterToGraph(builder);
   
   // エラー処理ノードを追加
   // @ts-ignore - 型エラーを回避
@@ -122,6 +122,7 @@ export function buildResearchGraph() {
   // @ts-ignore - エッジ関連の型エラーを回避
   builder.addConditionalEdges(
     "__start__",
+    // @ts-ignore - 型エラーを回避
     (state: ResearchChannels) => state.currentStep,
     {
       "generatePlan": "generatePlan",

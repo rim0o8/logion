@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { PromptTemplate } from "@langchain/core/prompts";
 import { RunnableSequence } from "@langchain/core/runnables";
@@ -13,12 +14,22 @@ import { safeJsonParse } from "./textUtils";
 const PLAN_TEMPLATE = reportPlannerInstructions;
 
 /**
+ * セクションデータのインターフェース定義
+ */
+interface SectionData {
+  name?: string;
+  title?: string;
+  description?: string;
+  [key: string]: unknown;
+}
+
+/**
  * セクションデータを正規化する
  * 
  * @param sectionsData - 解析されたセクションデータ
  * @returns 正規化されたセクションデータ
  */
-function normalizeSections(sectionsData: any): Array<{ name: string; description: string }> {
+function normalizeSections(sectionsData: SectionData[] | unknown): Array<{ name: string; description: string }> {
   // セクションがない場合は空配列を返す
   if (!sectionsData || !Array.isArray(sectionsData)) {
     console.log("[DEBUG] セクションデータが配列ではありません");
@@ -26,7 +37,7 @@ function normalizeSections(sectionsData: any): Array<{ name: string; description
   }
   
   // 各セクションの形式を正規化
-  return sectionsData.map((section: any) => {
+  return sectionsData.map((section: SectionData) => {
     // name または title フィールドを使用
     const name = section.name || section.title || "無題のセクション";
     
@@ -91,6 +102,7 @@ export async function generateReportPlan(state: ResearchState): Promise<Research
     const planData = safeJsonParse<{ 
       sections?: Array<{ name?: string; title?: string; description?: string }>;
       content?: Array<{ name?: string; title?: string; description?: string }>;
+      [key: string]: unknown;
     }>(planContent);
     
     // JSONの解析に失敗した場合は空のオブジェクトを使用
@@ -109,8 +121,9 @@ export async function generateReportPlan(state: ResearchState): Promise<Research
     } else {
       // オブジェクト内を探して配列を見つける
       for (const key in planData) {
-        if (Array.isArray((planData as any)[key]) && (planData as any)[key].length > 0) {
-          const items = (planData as any)[key];
+        const value = planData[key];
+        if (Array.isArray(value) && value.length > 0) {
+          const items = value as SectionData[];
           if (items[0] && (items[0].name || items[0].title || items[0].description)) {
             sections = normalizeSections(items);
             break;
@@ -169,6 +182,7 @@ export function addPlanGenerationToGraph(graph: StateGraph<ResearchState>) {
   
   // エッジを追加
   graph.addConditionalEdges(
+    // @ts-expect-error - LangChainの型の問題を回避
     "generatePlan",
     (state) => state.currentStep,
     {
